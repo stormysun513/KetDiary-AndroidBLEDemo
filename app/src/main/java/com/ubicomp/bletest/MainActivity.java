@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -67,6 +68,7 @@ public class MainActivity extends Activity implements BluetoothListener {
             @Override
             public void onClick(View v) {
                 if (ble != null) {
+                    ble.setManualDisconnectFlag(true);
                     ble.bleDisconnect();
                     ble = null;
                 }
@@ -162,8 +164,22 @@ public class MainActivity extends Activity implements BluetoothListener {
     }
 
     @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event)
+    {
+
+        if (keyCode == KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0)
+        {
+            this.moveTaskToBack(true);
+            return true;
+        }
+
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
+        Log.i(TAG, "On destroy.");
         if(ble != null) {
             ble.bleDisconnect();
         }
@@ -198,6 +214,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     public void bleConnected() {
     	Toast.makeText(this, "BLE connected", Toast.LENGTH_SHORT).show();
         Log.i(TAG, "BLE connected");
+        editTextBlock.setText("");
         clearTextViewInfo();
         clearImageViewPreview();
     }

@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -75,11 +74,12 @@ public class BluetoothLE {
     private String mDeviceAddress = null;
 
 	private BluetoothAdapter mBluetoothAdapter;
-    private BluetoothLeService mBluetoothLeService;
-    private BluetoothDataParserService mBluetoothDataParserService;
+    private BluetoothLeService mBluetoothLeService = null;
+    private BluetoothDataParserService mBluetoothDataParserService = null;
     private boolean mConnected = false;
-    private boolean deviceScanned = false;
-    private boolean parserRunning = false;
+    private boolean mDeviceScanned = false;
+
+    private boolean mManualDisconnect = false;
 
     private BluetoothGattCharacteristic mNotifyCharacteristic;
     private BluetoothGattCharacteristic mWriteCharacteristic;
@@ -89,7 +89,6 @@ public class BluetoothLE {
 
     // Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 3000;
-
     public AppState mAppState = AppState.APP_FETCH_INFO;
 
     public BluetoothLE(Activity activity, String mDeviceName) {
@@ -134,8 +133,8 @@ public class BluetoothLE {
 	
 	    @Override
 	    public void onServiceDisconnected(ComponentName componentName) {
-	        mBluetoothLeService = null;
             unbindBLEService();
+            mBluetoothLeService = null;
 	    }
 	};
 
@@ -144,14 +143,16 @@ public class BluetoothLE {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
             mBluetoothDataParserService = ((BluetoothDataParserService.LocalBinder) iBinder).getService();
-            Log.i(TAG, "Successfully bound BluetoothDataParser Service.");
+            Log.i(TAG, "Successfully bind BluetoothDataParser Service.");
         }
 
         @Override
         public void onServiceDisconnected(ComponentName componentName) {
-            mBluetoothDataParserService = null;
+            // onServiceDisconnected is called when service was terminated by stopSelf() or stopService() and service is still bound.
+
             activity.unbindService(mDataParserServiceConnection);
-            Log.i(TAG, "Unbound BluetoothDataParser Service.");
+            mBluetoothDataParserService = null;
+            Log.i(TAG, "Unbind BluetoothDataParser Service.");
         }
     };
 
@@ -169,8 +170,13 @@ public class BluetoothLE {
 
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 mConnected = false;
+//                if(mManualDisconnect){
                 ((BluetoothListener) activity).bleDisconnected();
                 unbindBLEService();
+//                }
+//                else{
+//                    bleConnect();
+//                }
 
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 // Show all the supported services and characteristics on the user interface.
@@ -184,6 +190,7 @@ public class BluetoothLE {
                 BluetoothGattDescriptor descriptor = mNotifyCharacteristic.getDescriptor(uuid);
                 descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                 mBluetoothLeService.writeDescriptor(descriptor);
+                /****/
                 
                 mWriteCharacteristic = gattServices.get(2).getCharacteristic(SERVICE3_WRITE_CHAR_UUID);
                 Log.i(TAG, "BLE ACTION_GATT_SERVICES_DISCOVERED");
@@ -226,7 +233,6 @@ public class BluetoothLE {
                             Intent intentToParserService = new Intent(activity.getBaseContext(), BluetoothDataParserService.class);
                             intentToParserService.putExtra(BluetoothDataParserService.EXTRA_HEADER_DATA, data);
                             activity.startService(intentToParserService);
-                            parserRunning = true;
                         }
                         break;
                     case APP_IMAGE_RECEIVED:
@@ -249,14 +255,14 @@ public class BluetoothLE {
             }
             else if (BluetoothDataParserService.ACTION_IMAGE_RECEIVED_SUCCESS.equals(action)){
                 mAppState = AppState.APP_IMAGE_RECEIVED;
+                ((MainActivity) activity).updateTextViewInfo(String.format("%.1f", 100.0) + "%");
                 terminatePacketParser();
+
                 byte[] data = intent.getByteArrayExtra(BluetoothDataParserService.EXTRA_IMAGE_DATA);
                 new UpdataUIAsyncTask().execute(data);
-                Log.i(TAG, "Received entire image.");
             }
             else if (BluetoothDataParserService.ACTION_IMAGE_HEADER_CHECKED.equals(action)){
                 mAppState = AppState.APP_IMAGE_RECEIVING;
-
                 Intent _Intent = new Intent(activity, BluetoothDataParserService.class);
                 activity.bindService(_Intent, mDataParserServiceConnection, Context.BIND_AUTO_CREATE);
 
@@ -264,8 +270,21 @@ public class BluetoothLE {
                 bleWriteCharacteristic1(command);
                 Log.i(TAG, "Received data header information.");
             }
+            else if (BluetoothDataParserService.ACTION_UPDATA_TRANSFER_PROGRESS.equals(action)){
+                float progress = intent.getFloatExtra(BluetoothDataParserService.EXTRA_TRANSFER_INFO_DATA, -1);
+                ((MainActivity) activity).updateTextViewInfo(String.format("%.1f", 100*progress) + "%" );
+            }
             else if (BluetoothDataParserService.ACTION_ACK_LOST_PACKETS.equals(action)){
-
+                byte[] command = intent.getByteArrayExtra(BluetoothDataParserService.EXTRA_TRANSFER_INFO_DATA);
+                bleWriteCharacteristic1(command);
+            }
+            else if (BluetoothDataParserService.ACTION_IMAGE_RECEIVED_FAILED.equals(action)){
+                terminatePacketParser();
+                float dropoutRate = intent.getFloatExtra(BluetoothDataParserService.EXTRA_TRANSFER_INFO_DATA, -1);
+                // Print dropout rate
+                ((MainActivity) activity).updateTextViewInfo("Dropout:" + String.format("%.1f", 100*(1-dropoutRate)) + "%" );
+                mAppState = AppState.APP_FETCH_INFO;
+                Log.i(TAG, "Can not retrieve data.");
             }
             else{
                 Log.i(TAG, "----BLE Can't handle data----");
@@ -277,7 +296,7 @@ public class BluetoothLE {
     private void unbindBLEService() {
         activity.unbindService(mBluetoothLeServiceConnection);
         activity.unregisterReceiver(mGattUpdateReceiver);
-        deviceScanned = false;
+        mDeviceScanned = false;
     }
 
 	public void bleConnect() {
@@ -297,13 +316,11 @@ public class BluetoothLE {
 	}
 
     public void terminatePacketParser() {
-        if(parserRunning) {
-            Log.i(TAG, "Wait for stopping BluetoothDataParserService.");
-            if(mBluetoothLeService != null)
-                activity.unbindService(mDataParserServiceConnection);
+        if(mBluetoothDataParserService != null){
+            Log.i(TAG, "Stopping BluetoothDataParserService.");
+            activity.unbindService(mDataParserServiceConnection);
             mBluetoothDataParserService = null;
             activity.stopService(new Intent(activity.getBaseContext(), BluetoothDataParserService.class));
-            parserRunning = false;
         }
     }
 
@@ -312,7 +329,6 @@ public class BluetoothLE {
             mBluetoothLeService.disconnect();
         }
         terminatePacketParser();
-
         if(!mConnected) {
             //Terminate the BLE connection timeout (10sec)
             mHandler.removeCallbacks(mRunnable);
@@ -358,11 +374,12 @@ public class BluetoothLE {
         intentFilter.addAction(BluetoothDataParserService.ACTION_IMAGE_RECEIVED_SUCCESS);
         intentFilter.addAction(BluetoothDataParserService.ACTION_IMAGE_HEADER_CHECKED);
         intentFilter.addAction(BluetoothDataParserService.ACTION_ACK_LOST_PACKETS);
+        intentFilter.addAction(BluetoothDataParserService.ACTION_IMAGE_RECEIVED_FAILED);
+        intentFilter.addAction(BluetoothDataParserService.ACTION_UPDATA_TRANSFER_PROGRESS);
 
         return intentFilter;
     }
 
-	
 	public void onBLEActivityResult(int requestCode, int resultCode, Intent data) {
 		switch (requestCode) {
             case REQUEST_ENABLE_BT:{
@@ -380,13 +397,17 @@ public class BluetoothLE {
 		}
 	}
 
+    public void setManualDisconnectFlag(boolean flags){
+        mManualDisconnect = flags;
+    }
+
     // Device scan callback.
     private BluetoothAdapter.LeScanCallback mLeScanCallback =
             new BluetoothAdapter.LeScanCallback() {
                 @Override
                 public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
                     // Do nothing if target device is scanned
-                    if(deviceScanned)
+                    if(mDeviceScanned)
                         return;
 
                     String scannedName = device.getName();
@@ -394,13 +415,15 @@ public class BluetoothLE {
                         BLEAdvertisedData badData = new BLEUtil().parseAdertisedData(scanRecord);
                         scannedName = badData.getName();
                     }
+
                     Log.d(TAG, "Device = " + scannedName + ", Address = " + device.getAddress());
 
                     if(mDeviceName.equals(scannedName)){
                         mDeviceAddress = device.getAddress();
-                        deviceScanned = true;
+                        mDeviceScanned = true;
 
                         Intent gattServiceIntent = new Intent(activity, BluetoothLeService.class);
+
                         activity.bindService(gattServiceIntent, mBluetoothLeServiceConnection, Context.BIND_AUTO_CREATE);
                         activity.registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
                         mBluetoothAdapter.stopLeScan(mLeScanCallback);
@@ -460,9 +483,7 @@ public class BluetoothLE {
         }
     }
 
-
     public class BLEAdvertisedData {
-
         private List<UUID> mUuids;
         private String mName;
         public BLEAdvertisedData(List<UUID> uuids, String name){
@@ -473,7 +494,6 @@ public class BluetoothLE {
         public List<UUID> getUuids(){
             return mUuids;
         }
-
         public String getName(){
             return mName;
         }
@@ -495,7 +515,6 @@ public class BluetoothLE {
             if (!mainStorage.exists())
                 mainStorage.mkdirs();
 
-//            Timestamp timestamp = new Timestamp(System.currentTimeMillis());
             Long tsLong = System.currentTimeMillis()/1000;
             file = new File(mainStorage, "PIC_".concat(String.valueOf(tsLong.toString())).concat(".jpg"));
 
@@ -505,7 +524,6 @@ public class BluetoothLE {
                 fos.close();
             } catch (IOException e) {
                 Log.d(TAG, "FAIL TO OPEN FILES: " + file.getAbsolutePath());
-
             }
             return bytes[0];
         }

@@ -198,7 +198,7 @@ public class BluetoothLeService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         byte [] data = intent.getByteArrayExtra(EXTRA_DATA);
-        Log.i(TAG, "BluetoothDataParserService starts.");
+        Log.i(TAG, "BluetoothLeService starts.");
         return START_NOT_STICKY;
     }
 
