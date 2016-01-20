@@ -1,0 +1,45 @@
+package com.ubicomp.bletest;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+
+public interface BluetoothListener {
+
+    Context getContext();
+
+	public Activity activity = null;
+	
+    void onActivityResult(int requestCode, int resultCode, Intent data);
+
+    /* BLE is not supported in this device */
+    void bleNotSupported();
+
+    /* BLE connection establishment timeout (10sec) */
+    void bleConnectionTimeout();
+
+    /* BLE connection established successfully */
+    void bleConnected();
+
+    /* BLE disconnected */
+    void bleDisconnected();
+
+    /* BLE write state success */
+    void bleWriteCharacteristic1Success();
+
+    /* BLE write state fail */
+    void bleWriteStateFail();
+
+    /* Can not detect test plug */
+    void bleNoPlug();
+
+    /* Test plug is detected with its ID */
+    void blePlugInserted(byte[] plugId);
+
+    /* Electrode state:
+    state: 0xFC=not yet conduct, 0xFD=1st is conducted, 2ed is conducted,
+    adcReading: 2 bytes
+     */
+
+    void bleElectrodeAdcReading(byte state, byte[] adcReading);
+}

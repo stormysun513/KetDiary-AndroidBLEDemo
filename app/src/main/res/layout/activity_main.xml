@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginTop="40dp"
+        android:fontFamily="sans-serif"
+        android:textSize="48sp"
+        android:gravity="center"
+        android:text="BLETest"/>
+
+    <TextView
+        android:id="@+id/textViewInfo"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:textSize="20sp"
+        android:gravity="center"
+        android:text=""/>
+
+    <ImageView
+        android:id="@+id/imageViewPreview"
+        android:layout_width="320sp"
+        android:layout_height="240sp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="20dp"
+        android:background="#E8E3E4"/>
+
+    <EditText
+        android:id="@+id/editTextBlock"
+        android:background="@drawable/style_edit_text"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginLeft="10dp"
+        android:layout_marginRight="10dp"
+        android:layout_marginBottom="20dp"
+        android:paddingLeft="15dp"
+        android:paddingRight="15dp"
+        android:ems="10" >
+        <requestFocus />
+    </EditText>
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/buttonStart"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Start"
+                android:layout_alignParentLeft="true"/>
+
+            <Button
+                android:id="@+id/buttonClose"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="@string/button_close"
+                android:layout_centerHorizontal="true"/>
+
+            <Button
+                android:id="@+id/buttonSendData"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="SendData"
+                android:layout_alignParentRight="true"/>
+
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/buttonSnapshot"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Snapshot"
+                android:layout_alignParentLeft="true"/>
+
+            <Button
+                android:id="@+id/buttonVoltage"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Voltage"
+                android:layout_centerHorizontal="true"/>
+
+            <Button
+                android:id="@+id/buttonDeviceInfo"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="DeviceInfo"
+                android:layout_alignParentRight="true"/>
+
+        </RelativeLayout>
+
+    </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>
