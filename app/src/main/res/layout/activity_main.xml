@@ -58,24 +58,24 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/buttonStart"
+                android:id="@+id/buttonSwitch"
                 android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="Start"
                 android:layout_alignParentLeft="true"/>
 
             <Button
-                android:id="@+id/buttonClose"
-                android:layout_width="120dp"
-                android:layout_height="wrap_content"
-                android:text="@string/button_close"
-                android:layout_centerHorizontal="true"/>
-
-            <Button
                 android:id="@+id/buttonSendData"
                 android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="SendData"
+                android:layout_centerHorizontal="true"/>
+
+            <Button
+                android:id="@+id/buttonSnapshot"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Snapshot"
                 android:layout_alignParentRight="true"/>
 
         </RelativeLayout>
@@ -86,24 +86,52 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/buttonSnapshot"
+                android:id="@+id/buttonNotification"
                 android:layout_width="120dp"
                 android:layout_height="wrap_content"
-                android:text="Snapshot"
+                android:text="NotifyInfo"
                 android:layout_alignParentLeft="true"/>
 
             <Button
-                android:id="@+id/buttonVoltage"
+                android:id="@+id/buttonGetSalivaVoltage"
                 android:layout_width="120dp"
                 android:layout_height="wrap_content"
-                android:text="Voltage"
+                android:text="MonitorSaliva"
                 android:layout_centerHorizontal="true"/>
 
             <Button
-                android:id="@+id/buttonDeviceInfo"
+                android:id="@+id/buttonDeMonitor"
                 android:layout_width="120dp"
                 android:layout_height="wrap_content"
-                android:text="DeviceInfo"
+                android:text="DeMonitor"
+                android:layout_alignParentRight="true"/>
+
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/buttonGetId"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="GetId"
+                android:layout_alignParentLeft="true"/>
+
+            <Button
+                android:id="@+id/buttonWriteId"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="WriteId"
+                android:layout_centerHorizontal="true"/>
+
+            <Button
+                android:id="@+id/buttonBattery"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Battery"
                 android:layout_alignParentRight="true"/>
 
         </RelativeLayout>

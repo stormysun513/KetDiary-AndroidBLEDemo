@@ -111,11 +111,11 @@ public class BluetoothDataParserService extends Service {
                     dataBuf[currentPacketId] = new byte[bufOffset];
                     System.arraycopy(tempBuf, 0, dataBuf[currentPacketId], 0, bufOffset);
                     if(recvPacketIdTable.contains(currentPacketId)){
-                        Log.i(TAG, "Already received packet index: " + String.valueOf(currentPacketId) + "/ " + String.valueOf(packetNum - 1));
+                        Log.d(TAG, "Already received packet index: " + String.valueOf(currentPacketId) + "/ " + String.valueOf(packetNum - 1));
                     }
                     else{
                         recvPacketIdTable.add(currentPacketId);
-                        Log.i(TAG, "Receive packet index: " + String.valueOf(currentPacketId) + "/ " + String.valueOf(packetNum - 1));
+                        Log.d(TAG, "Receive packet index: " + String.valueOf(currentPacketId) + "/ " + String.valueOf(packetNum - 1));
                         recvNum++;
                     }
                 }
@@ -171,7 +171,7 @@ public class BluetoothDataParserService extends Service {
     @Override
     public void onDestroy() {
         mHandler.removeCallbacks(checkTimeoutRunnable);
-        Log.i(TAG, "BluetoothDataParserService has been terminated.");
+        Log.d(TAG, "BluetoothDataParserService has been terminated.");
         super.onDestroy();
     }
 
@@ -182,7 +182,7 @@ public class BluetoothDataParserService extends Service {
                 timerCounter = 0;
 
             // Current time log
-            Log.i(TAG, "Time: " + new Date().toString() + ", Counter: " + String.valueOf(timerCounter));
+            Log.d(TAG, "Time: " + new Date().toString() + ", Counter: " + String.valueOf(timerCounter));
 
             if(timerCounter >= MAX_TIMEOUT_TIME){
                 retransmitTime++;
@@ -218,7 +218,7 @@ public class BluetoothDataParserService extends Service {
     };
 
     private void checkDataBuf() {
-        Log.i(TAG, "Dropout rate: " + (float)(packetNum-recvNum)*100/packetNum + "%");
+        Log.d(TAG, "Dropout rate: " + (float)(packetNum-recvNum)*100/packetNum + "%");
         if(recvNum >= packetNum){
 
             int currentIdx = 0;
@@ -259,7 +259,7 @@ public class BluetoothDataParserService extends Service {
             remainPacketNum = 18;
 
         totalRetransPkts += remainPacketNum;
-        Log.i(TAG, "Request " + remainPacketNum + " packets.");
+        Log.d(TAG, "Request " + remainPacketNum + " packets.");
 
         byte [] bytes = new byte [remainPacketNum+2];
         bytes[0] = BluetoothLE.BLE_REQUEST_IMAGE_BY_INDEX;
@@ -284,7 +284,7 @@ public class BluetoothDataParserService extends Service {
             else
                 stringBuffer.append(s1);
         }
-        Log.i(TAG, "Indices: " + stringBuffer.toString());
+        Log.d(TAG, "Indices: " + stringBuffer.toString());
         return bytes;
     }
 

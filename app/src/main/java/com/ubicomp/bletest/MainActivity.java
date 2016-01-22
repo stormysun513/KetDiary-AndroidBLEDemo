@@ -26,13 +26,29 @@ public class MainActivity extends Activity implements BluetoothListener {
     private EditText editTextBlock;
     private TextView textViewInfo;
     private ImageView imageViewPreview;
-    private Button buttonStart;
-    private Button buttonClose;
+    private Button buttonSwitch;
     private Button buttonSendData;
     private Button buttonSnapshot;
-    private Button buttonVoltage;
-    private Button buttonDeviceInfo;
-	
+    private Button buttonGetSalivaVoltage;
+    private Button buttonDeMonitor;
+    private Button buttonNotification;
+    private Button buttonGetId;
+    private Button buttonWriteId;
+    private Button buttonBattery;
+
+    public enum DisplayTypeDef{
+        DISPLAY_NONE,
+        DISPLAY_VOLTAGE,
+        DISPLAY_BATTERY,
+        DISPLAY_DEVICE_ID
+    };
+
+    private int casecatteId = 0xFFFF;
+    private float salivaVoltage = 0xFFFF;
+    private float batteryLevel = 0xFFFF;
+
+    public static DisplayTypeDef mDisplayTypeDef = DisplayTypeDef.DISPLAY_NONE;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -41,41 +57,59 @@ public class MainActivity extends Activity implements BluetoothListener {
         editTextBlock = (EditText)findViewById(R.id.editTextBlock);
         textViewInfo = (TextView)findViewById(R.id.textViewInfo);
         imageViewPreview = (ImageView)findViewById(R.id.imageViewPreview);
-        buttonStart = (Button)findViewById(R.id.buttonStart);
-        buttonClose = (Button)findViewById(R.id.buttonClose);
+        buttonSwitch = (Button)findViewById(R.id.buttonSwitch);
+        buttonDeMonitor = (Button)findViewById(R.id.buttonDeMonitor);
         buttonSendData = (Button)findViewById(R.id.buttonSendData);
         buttonSnapshot = (Button)findViewById(R.id.buttonSnapshot);
-        buttonVoltage = (Button)findViewById(R.id.buttonVoltage);
-        buttonDeviceInfo = (Button)findViewById(R.id.buttonDeviceInfo);
+        buttonGetSalivaVoltage = (Button)findViewById(R.id.buttonGetSalivaVoltage);
+        buttonDeMonitor = (Button)findViewById(R.id.buttonDeMonitor);
+        buttonNotification = (Button)findViewById(R.id.buttonNotification);
+        buttonGetId = (Button)findViewById(R.id.buttonGetId);
+        buttonWriteId = (Button)findViewById(R.id.buttonWriteId);
+        buttonBattery = (Button)findViewById(R.id.buttonBattery);
 
-        buttonStart.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                if(ble != null)
-                    return;
-                String deviceName = editTextBlock.getText().toString();
-                if(deviceName == "")
-                    return;
-                ble = new BluetoothLE(mainActivity, deviceName);
-                ble.bleConnect();
-            }
-
-        });
-
-        buttonClose.setOnClickListener(new View.OnClickListener() {
+        buttonSwitch.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View v) {
-                if (ble != null) {
+                if (ble != null && buttonSwitch.getText().toString().equals("Close")){
                     ble.setManualDisconnectFlag(true);
                     ble.bleDisconnect();
                     ble = null;
                 }
+                else if(ble == null && buttonSwitch.getText().toString().equals("Start")){
+                    String deviceName = editTextBlock.getText().toString();
+                    if (deviceName.equals(""))
+                        return;
+                    ble = new BluetoothLE(mainActivity, deviceName);
+                    ble.bleConnect();
+                }
+                else if(ble != null){
+                    if(ble.isScanning()){
+                        String deviceName = editTextBlock.getText().toString();
+                        if (deviceName.equals(""))
+                            return;
+                        ble.setDeviceName(deviceName);
+                        ble.bleConnect();
+                    }
+                }
+                else{
+                    return;
+                }
             }
 
         });
-        
+
+        buttonDeMonitor.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                if(ble == null)
+                    return;
+            }
+
+        });
+
         buttonSendData.setOnClickListener(new View.OnClickListener() {
 
             @Override
@@ -88,7 +122,7 @@ public class MainActivity extends Activity implements BluetoothListener {
                 Pattern pattern = Pattern.compile(regPatternStr);
                 Matcher matcher = pattern.matcher(inputStr);
                 if (matcher.find()){
-                    Log.i(TAG, "Contain illegal characters.");
+                    Log.d(TAG, "Contain illegal characters.");
                     return;
                 }
 
@@ -129,38 +163,119 @@ public class MainActivity extends Activity implements BluetoothListener {
                     return;
 
                 byte [] command = new byte[] {BluetoothLE.BLE_REQUEST_IMAGE_INFO};
-                ble.mAppState = BluetoothLE.AppState.APP_IMAGE_GET_HEADER;
+                ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_IMAGE_GET_HEADER;
                 ble.bleWriteCharacteristic1(command);
             }
         });
 
-        buttonVoltage.setOnClickListener(new View.OnClickListener(){
+        buttonGetSalivaVoltage.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View v) {
-                if(ble == null)
+                if (ble == null)
                     return;
 
-                byte [] command = new byte[] {BluetoothLE.BLE_REQUEST_SALIVA_VOLTAGE};
-                ble.mAppState = BluetoothLE.AppState.APP_FETCH_INFO;
+                mDisplayTypeDef = DisplayTypeDef.DISPLAY_VOLTAGE;
+                if(salivaVoltage != 0xFFFF){
+                    updateTextViewInfo("Voltage:"+String.valueOf(salivaVoltage));
+                }
+
+                byte[] command = new byte[]{BluetoothLE.BLE_REQUEST_SALIVA_VOLTAGE};
+                ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
                 ble.bleWriteCharacteristic1(command);
             }
         });
 
-        buttonDeviceInfo.setOnClickListener(new View.OnClickListener(){
+        buttonDeMonitor.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View view) {
+                if (ble == null)
+                    return;
+
+                mDisplayTypeDef = DisplayTypeDef.DISPLAY_NONE;
+                updateTextViewInfo("");
+
+
+                byte[] command = new byte[]{BluetoothLE.BLE_DEREQUEST_SALIVA_VOLTAGE};
+                ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
+                ble.bleWriteCharacteristic1(command);
+            }
+        });
+
+        buttonNotification.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View v) {
-                if(ble == null)
+                if (ble == null)
                     return;
 
-                byte [] command = new byte[] {BluetoothLE.BLE_REQUEST_DEVICE_ID};
-                ble.mAppState = BluetoothLE.AppState.APP_FETCH_INFO;
+                byte[] command = new byte[]{BluetoothLE.BLE_REQUEST_DEVICE_ID};
+                ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
                 ble.bleWriteCharacteristic1(command);
             }
         });
 
-        Log.i(TAG, "On create");
+        buttonGetId.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View view) {
+                mDisplayTypeDef = DisplayTypeDef.DISPLAY_DEVICE_ID;
+                if(casecatteId != 0xFFFF){
+                    updateTextViewInfo("ket_"+String.valueOf(casecatteId));
+                }
+            }
+        });
+
+        buttonWriteId.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View view) {
+                if (ble == null)
+                    return;
+
+                String inputStr = editTextBlock.getText().toString().replaceAll("\\s+", "").toLowerCase();
+                String regPatternStr = "[^0-9]";
+                Pattern pattern = Pattern.compile(regPatternStr);
+                Matcher matcher = pattern.matcher(inputStr);
+                if (matcher.find()) {
+                    Log.d(TAG, "Contain illegal characters.");
+                    return;
+                }
+
+                int sum = 0;
+                for (int i = 0; i < inputStr.length(); i++) {
+                    char ch = inputStr.charAt(i);
+                    sum = sum * 10 + ((int) ch - (int) '0');
+                }
+
+                if (sum > 0xFFFF) {
+                    Log.d(TAG, "Cannot surpass 65535");
+                    return;
+                }
+
+
+                byte dataByte1 = (byte) ((sum >> 8) & 0xFF);
+                byte dataByte2 = (byte) (sum & 0xFF);
+
+                byte[] command = new byte[]{BluetoothLE.BLE_CHANGE_DEVICE_ID, dataByte1, dataByte2};
+                ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
+                ble.bleWriteCharacteristic1(command);
+            }
+        });
+
+        buttonBattery.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View view) {
+                mDisplayTypeDef = DisplayTypeDef.DISPLAY_BATTERY;
+                if(batteryLevel != 0xFFFF){
+                    updateTextViewInfo("Temp:" + String.format("%.2f", batteryLevel));
+                }
+            }
+        });
+
+        Log.d(TAG, "On create");
     }
 
     @Override
@@ -179,7 +294,6 @@ public class MainActivity extends Activity implements BluetoothListener {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        Log.i(TAG, "On destroy.");
         if(ble != null) {
             ble.bleDisconnect();
         }
@@ -205,6 +319,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     @Override
     public void bleConnectionTimeout() {
         Toast.makeText(this, "BLE connection timeout", Toast.LENGTH_SHORT).show();
+        Log.d(TAG, "BLE connection timeout");
         if(ble != null) {
             ble = null;
         }
@@ -213,8 +328,9 @@ public class MainActivity extends Activity implements BluetoothListener {
     @Override
     public void bleConnected() {
     	Toast.makeText(this, "BLE connected", Toast.LENGTH_SHORT).show();
-        Log.i(TAG, "BLE connected");
+        Log.d(TAG, "BLE connected");
         editTextBlock.setText("");
+        buttonSwitch.setText("Close");
         clearTextViewInfo();
         clearImageViewPreview();
     }
@@ -222,41 +338,45 @@ public class MainActivity extends Activity implements BluetoothListener {
     @Override
     public void bleDisconnected() {
     	Toast.makeText(this, "BLE disconnected", Toast.LENGTH_SHORT).show();
-        Log.i(TAG, "BLE disconnected");
+        Log.d(TAG, "BLE disconnected");
+        buttonSwitch.setText("Start");
         if(ble != null) {
             ble = null;
         }
+        casecatteId = 0xFFFF;
+        salivaVoltage = 0xFFFF;
+        batteryLevel = 0xFFFF;
     }
 
     @Override
     public void bleWriteCharacteristic1Success() {
     	Toast.makeText(this, "BLE ACTION_DATA_WRITE_SUCCESS", Toast.LENGTH_SHORT).show();
-        Log.i(TAG, "BLE ACTION_DATA_WRITE_SUCCESS");
+        Log.d(TAG, "BLE ACTION_DATA_WRITE_SUCCESS");
     }
 
     @Override
     public void bleWriteStateFail() {
     	Toast.makeText(this, "BLE ACTION_DATA_WRITE_FAIL", Toast.LENGTH_SHORT).show();
-        Log.i(TAG, "BLE ACTION_DATA_WRITE_FAIL");
+        Log.d(TAG, "BLE ACTION_DATA_WRITE_FAIL");
     }
 
     @Override
     public void bleNoPlug() {
     	Toast.makeText(this, "No test plug", Toast.LENGTH_SHORT).show();
-        Log.i(TAG, "No test plug");
+        Log.d(TAG, "No test plug");
     }
 
     @Override
     public void blePlugInserted(byte[] plugId) {
     	//Toast.makeText(this, "Test plug is inserted", Toast.LENGTH_SHORT).show();
-        Log.i(TAG, "Test plug is inserted");
+        Log.d(TAG, "Test plug is inserted");
     }
 
 
 	@Override
 	public void bleElectrodeAdcReading(byte state, byte[] adcReading) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
     public void updateTextViewInfo(String string){
@@ -272,4 +392,18 @@ public class MainActivity extends Activity implements BluetoothListener {
     }
 
     public void clearImageViewPreview(){imageViewPreview.setImageDrawable(null);}
+
+    public void setCasecatteId(int id) { casecatteId = id;}
+
+    public void setBatteryLevel(float voltage) {batteryLevel = voltage;}
+
+    public void setSalivaVoltage(float voltage) {salivaVoltage = voltage;}
+
+    public void lockUIWhenImageTransferring(){
+        buttonGetSalivaVoltage.setEnabled(false);
+    }
+
+    public void unlockUIAfterEndofImageTransferring(){
+        buttonGetSalivaVoltage.setEnabled(true);
+    }
 }
