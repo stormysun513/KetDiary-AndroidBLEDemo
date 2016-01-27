@@ -20,9 +20,9 @@ public class BluetoothDataParserService extends Service {
     private final static String TAG = "BluetoothLE";
     private static final int TIMEOUT_PERIOD = 1000;
     private static final int MAX_TIMEOUT_TIME = 3;
-    private static final int MAX_RETRANSMIT_TIME = 4;
-    private static int timerCounter = 0;
-    private static int retransmitTime = 0;
+    private static final int MAX_RETRANSMIT_TIME = 5;
+    private int timerCounter = 0;
+    private int retransmitTime = 0;
 
     /* Actions messages */
     public final static String ACTION_IMAGE_HEADER_CHECKED =
@@ -64,9 +64,10 @@ public class BluetoothDataParserService extends Service {
     /* Service variables */
     private Handler mHandler = new Handler();
     private final IBinder mBinder = new LocalBinder();
+    private boolean isPaused = false;
 
     /* Performance evaluation */
-    private static int totalRetransPkts = 0;
+    private int totalRetransPkts = 0;
 
     public void parseDataPacket(byte [] data){
 
@@ -81,47 +82,43 @@ public class BluetoothDataParserService extends Service {
             }
 
             currentPacketId = seqNum;
-            if(currentPacketId == packetNum-1)
+            if(currentPacketId == packetNum-1) {
                 isLastPackets = true;
-            else
+            }
+            else {
                 isLastPackets = false;
+            }
 
-            if( !isLastPackets )
+            if( !isLastPackets ){
                 targetPacketSize = PACKET_SIZE;
-            else
+            }
+            else{
                 targetPacketSize = lastPacketSize;
+            }
 
-            System.arraycopy(data, 3, tempBuf, 0, data.length-3);
-            bufOffset += (data.length-3);
+            if(targetPacketSize > BLE_PACKET_SIZE-4){
+                System.arraycopy(data, 3, tempBuf, 0, data.length-3);
+                bufOffset += (data.length-3);
+            }
+            else{
+                Log.d(TAG, "Debug:" + String.valueOf(targetPacketSize) + " " + String.valueOf(isLastPackets));
+                System.arraycopy(data, 3, tempBuf, 0, data.length - 4);
+                bufOffset += (data.length-4);
+                int check = data[data.length-1] & 0xFF;
+                verifyPacketChecksum(check);
+
+                if (recvNum == packetNum)
+                    checkDataBuf();
+
+                bufOffset = 0;
+            }
         }
         else if(isVerifySeqNum == true){
             if (targetPacketSize - bufOffset <= BLE_PACKET_SIZE){
                 System.arraycopy(data, 1, tempBuf, bufOffset, data.length-2);
                 bufOffset += (data.length-2);
                 int check = data[data.length-1] & 0xFF;
-                int checksum = 0;
-
-                for(int i = 0; i < tempBuf.length; i++){
-                    checksum += (tempBuf[i] & 0xFF);
-                    checksum = checksum & 0xFF;
-                }
-//                Log.i(TAG, "Packet length : " + String.valueOf(bufOffset));
-//                Log.i(TAG, "Checksum : " + String.valueOf(checksum) + ", Check :" + String.valueOf(check));
-                if (checksum == check){
-                    dataBuf[currentPacketId] = new byte[bufOffset];
-                    System.arraycopy(tempBuf, 0, dataBuf[currentPacketId], 0, bufOffset);
-                    if(recvPacketIdTable.contains(currentPacketId)){
-                        Log.d(TAG, "Already received packet index: " + String.valueOf(currentPacketId) + "/ " + String.valueOf(packetNum - 1));
-                    }
-                    else{
-                        recvPacketIdTable.add(currentPacketId);
-                        Log.d(TAG, "Receive packet index: " + String.valueOf(currentPacketId) + "/ " + String.valueOf(packetNum - 1));
-                        recvNum++;
-                    }
-                }
-                else{
-                    Log.d(TAG, "Checksum error on ble packets ".concat(String.valueOf(currentPacketId)));
-                }
+                verifyPacketChecksum(check);
 
                 if (recvNum == packetNum || isLastPackets == true)
                     checkDataBuf();
@@ -150,9 +147,9 @@ public class BluetoothDataParserService extends Service {
                 packetNum++;
                 lastPacketSize = picTotalLen % PACKET_SIZE;
             }
-//            Log.d(TAG, "Total picture length:".concat(String.valueOf(picTotalLen)));
-//            Log.d(TAG, "Total packets:".concat(String.valueOf(packetNum)));
-//            Log.d(TAG, "Last packet size:".concat(String.valueOf(lastPacketSize)));
+            Log.d(TAG, "Total picture length:".concat(String.valueOf(picTotalLen)));
+            Log.d(TAG, "Total packets:".concat(String.valueOf(packetNum)));
+            Log.d(TAG, "Last packet size:".concat(String.valueOf(lastPacketSize)));
 
             dataBuf = new byte [MAXIMUM_PACKET_NUM][];
             tempBuf = new byte [PACKET_SIZE];
@@ -175,47 +172,92 @@ public class BluetoothDataParserService extends Service {
         super.onDestroy();
     }
 
+    public void setCheckTimeoutPause(boolean option){
+        isPaused = option;
+    }
+
     private Runnable checkTimeoutRunnable = new Runnable() {
         public void run() {
-            timerCounter++;
-            if(lastRecvNum != recvNum)
-                timerCounter = 0;
+            if(!isPaused) {
+                timerCounter++;
+                if(lastRecvNum != recvNum)
+                    timerCounter = 0;
 
-            // Current time log
-            Log.d(TAG, "Time: " + new Date().toString() + ", Counter: " + String.valueOf(timerCounter));
+                // Current time log
+//                Log.d(TAG, "Time: " + new Date().toString() + ", Counter: " + String.valueOf(timerCounter));
 
-            if(timerCounter >= MAX_TIMEOUT_TIME){
-                retransmitTime++;
-                if(retransmitTime >= MAX_RETRANSMIT_TIME){
-                    final Intent _intent = new Intent();
-                    _intent.setAction(ACTION_IMAGE_RECEIVED_FAILED);
-                    _intent.putExtra(EXTRA_TRANSFER_INFO_DATA, (float) recvNum / packetNum);
-                    sendBroadcast(_intent);
-                    return;
+                if(timerCounter >= MAX_TIMEOUT_TIME){
+                    retransmitTime++;
+                    if(retransmitTime >= MAX_RETRANSMIT_TIME){
+                        final Intent _intent = new Intent();
+                        _intent.setAction(ACTION_IMAGE_RECEIVED_FAILED);
+                        _intent.putExtra(EXTRA_TRANSFER_INFO_DATA, (float) recvNum / packetNum);
+                        sendBroadcast(_intent);
+                        return;
+                    }
+                    else{
+                        if(recvNum < packetNum){
+                            Log.d(TAG, "Time: " + new Date().toString());
+                            byte [] retransmitData = getRetransmitIndices();
+                            final Intent _intent = new Intent();
+                            _intent.setAction(ACTION_ACK_LOST_PACKETS);
+                            _intent.putExtra(EXTRA_TRANSFER_INFO_DATA, retransmitData);
+                            sendBroadcast(_intent);
+                            bufOffset = 0;
+                        }
+                    }
+                    timerCounter = 0;
                 }
                 else{
-                    if(recvNum < packetNum){
-                        byte [] retransmitData = getRetransmitIndices();
-                        final Intent _intent = new Intent();
-                        _intent.setAction(ACTION_ACK_LOST_PACKETS);
-                        _intent.putExtra(EXTRA_TRANSFER_INFO_DATA, retransmitData);
-                        sendBroadcast(_intent);
-                        bufOffset = 0;
-                    }
+                    final Intent _intent = new Intent();
+                    _intent.setAction(ACTION_UPDATA_TRANSFER_PROGRESS);
+                    _intent.putExtra(EXTRA_TRANSFER_INFO_DATA, (float) recvNum/packetNum);
+                    sendBroadcast(_intent);
                 }
-                timerCounter = 0;
-            }
-            else{
-                final Intent _intent = new Intent();
-                _intent.setAction(ACTION_UPDATA_TRANSFER_PROGRESS);
-                _intent.putExtra(EXTRA_TRANSFER_INFO_DATA, (float) recvNum/packetNum);
-                sendBroadcast(_intent);
             }
 
             mHandler.postDelayed(this, TIMEOUT_PERIOD);
             lastRecvNum = recvNum;
         }
     };
+
+    private void verifyPacketChecksum(int check){
+        int checksum = 0;
+
+        for(int i = 0; i < bufOffset; i++){
+            checksum += (tempBuf[i] & 0xFF);
+            checksum = checksum & 0xFF;
+        }
+//                Log.i(TAG, "Packet length : " + String.valueOf(bufOffset));
+//                Log.i(TAG, "Checksum : " + String.valueOf(checksum) + ", Check :" + String.valueOf(check));
+        if (checksum == check){
+            dataBuf[currentPacketId] = new byte[bufOffset];
+            System.arraycopy(tempBuf, 0, dataBuf[currentPacketId], 0, bufOffset);
+            if(recvPacketIdTable.contains(currentPacketId)){
+                Log.d(TAG, "Already received packet index: " + String.valueOf(currentPacketId) + "/ " + String.valueOf(packetNum - 1));
+            }
+            else{
+                recvPacketIdTable.add(currentPacketId);
+                Log.d(TAG, "Receive packet index: " + String.valueOf(currentPacketId) + "/ " + String.valueOf(packetNum - 1));
+                recvNum++;
+            }
+        }
+        else{
+            Log.d(TAG, "Checksum error on ble packets ".concat(String.valueOf(currentPacketId)));
+            Log.i(TAG, "Checksum : " + String.format("%2s", Integer.toHexString(checksum).replace(' ', '0')) +
+                    ", Check :" +String.format("%2s", Integer.toHexString(check).replace(' ', '0')));
+
+//            StringBuffer stringBuffer = new StringBuffer("");
+//            for(int ii=0; ii<tempBuf.length;ii++){
+//                String s1 = String.valueOf(tempBuf[ii] & 0xFF);
+//                if( ii != tempBuf.length-1)
+//                    stringBuffer.append(s1 + ",");
+//                else
+//                    stringBuffer.append(s1);
+//            }
+//            Log.i(TAG, stringBuffer.toString());
+        }
+    }
 
     private void checkDataBuf() {
         Log.d(TAG, "Dropout rate: " + (float)(packetNum-recvNum)*100/packetNum + "%");
@@ -268,10 +310,10 @@ public class BluetoothDataParserService extends Service {
         int i = 0;
         for(int j = 0; j < packetNum; j++){
             if(!recvPacketIdTable.contains(j)){
+                if(i >= remainPacketNum)
+                    break;
                 bytes[i+2] = (byte)(j & 0xFF);
                 i++;
-                if(i >= bytes.length)
-                    break;
             }
         }
 

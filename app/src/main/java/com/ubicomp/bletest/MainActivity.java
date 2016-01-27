@@ -41,7 +41,7 @@ public class MainActivity extends Activity implements BluetoothListener {
         DISPLAY_VOLTAGE,
         DISPLAY_BATTERY,
         DISPLAY_DEVICE_ID
-    };
+    }
 
     private int casecatteId = 0xFFFF;
     private float salivaVoltage = 0xFFFF;
@@ -58,7 +58,6 @@ public class MainActivity extends Activity implements BluetoothListener {
         textViewInfo = (TextView)findViewById(R.id.textViewInfo);
         imageViewPreview = (ImageView)findViewById(R.id.imageViewPreview);
         buttonSwitch = (Button)findViewById(R.id.buttonSwitch);
-        buttonDeMonitor = (Button)findViewById(R.id.buttonDeMonitor);
         buttonSendData = (Button)findViewById(R.id.buttonSendData);
         buttonSnapshot = (Button)findViewById(R.id.buttonSnapshot);
         buttonGetSalivaVoltage = (Button)findViewById(R.id.buttonGetSalivaVoltage);
@@ -72,12 +71,12 @@ public class MainActivity extends Activity implements BluetoothListener {
 
             @Override
             public void onClick(View v) {
-                if (ble != null && buttonSwitch.getText().toString().equals("Close")){
+                if (ble != null && buttonSwitch.getText().toString().equals(getString(R.string.button_close))){
                     ble.setManualDisconnectFlag(true);
                     ble.bleDisconnect();
                     ble = null;
                 }
-                else if(ble == null && buttonSwitch.getText().toString().equals("Start")){
+                else if(ble == null && buttonSwitch.getText().toString().equals(getString(R.string.button_start))){
                     String deviceName = editTextBlock.getText().toString();
                     if (deviceName.equals(""))
                         return;
@@ -93,21 +92,7 @@ public class MainActivity extends Activity implements BluetoothListener {
                         ble.bleConnect();
                     }
                 }
-                else{
-                    return;
-                }
             }
-
-        });
-
-        buttonDeMonitor.setOnClickListener(new View.OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                if(ble == null)
-                    return;
-            }
-
         });
 
         buttonSendData.setOnClickListener(new View.OnClickListener() {
@@ -330,7 +315,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     	Toast.makeText(this, "BLE connected", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "BLE connected");
         editTextBlock.setText("");
-        buttonSwitch.setText("Close");
+        buttonSwitch.setText(getString(R.string.button_close));
         clearTextViewInfo();
         clearImageViewPreview();
     }
@@ -339,7 +324,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     public void bleDisconnected() {
     	Toast.makeText(this, "BLE disconnected", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "BLE disconnected");
-        buttonSwitch.setText("Start");
+        buttonSwitch.setText(getString(R.string.button_start));
         if(ble != null) {
             ble = null;
         }
@@ -372,13 +357,6 @@ public class MainActivity extends Activity implements BluetoothListener {
         Log.d(TAG, "Test plug is inserted");
     }
 
-
-	@Override
-	public void bleElectrodeAdcReading(byte state, byte[] adcReading) {
-		// TODO Auto-generated method stub
-
-	}
-
     public void updateTextViewInfo(String string){
         textViewInfo.setText(string);
     }
@@ -398,12 +376,4 @@ public class MainActivity extends Activity implements BluetoothListener {
     public void setBatteryLevel(float voltage) {batteryLevel = voltage;}
 
     public void setSalivaVoltage(float voltage) {salivaVoltage = voltage;}
-
-    public void lockUIWhenImageTransferring(){
-        buttonGetSalivaVoltage.setEnabled(false);
-    }
-
-    public void unlockUIAfterEndofImageTransferring(){
-        buttonGetSalivaVoltage.setEnabled(true);
-    }
 }

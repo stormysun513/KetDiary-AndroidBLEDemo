@@ -172,6 +172,8 @@ public class BluetoothLE {
                 //Terminate the BLE connection timeout (10sec)
                 mHandler.removeCallbacks(mRunnable);
                 mScanning = false;
+                if(mBluetoothDataParserService != null)
+                    mBluetoothDataParserService.setCheckTimeoutPause(false);
                 ((BluetoothListener) activity).bleConnected();
 
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
@@ -182,6 +184,9 @@ public class BluetoothLE {
                 }
                 else{
                     Log.d(TAG, "Reconnection started.");
+                    if(mBluetoothDataParserService != null)
+                        mBluetoothDataParserService.setCheckTimeoutPause(true);
+
                     mReconnection = true;
                     bleConnect();
                 }
@@ -212,15 +217,15 @@ public class BluetoothLE {
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
             	byte[] data = intent.getByteArrayExtra(BluetoothLeService.EXTRA_DATA);
             	
-//            	StringBuffer stringBuffer = new StringBuffer("");
-//            	for(int ii=0;ii<data.length;ii++){
-//                    String s1 = String.format("%2s", Integer.toHexString(data[ii] & 0xFF)).replace(' ', '0');
-//                    if( ii != data.length-1)
-//                        stringBuffer.append(s1 + ":");
-//                    else
-//                        stringBuffer.append(s1);
-//            	}
-//            	Log.i(TAG, stringBuffer.toString());
+            	StringBuffer stringBuffer = new StringBuffer("");
+            	for(int ii=0;ii<data.length;ii++){
+                    String s1 = String.format("%2s", Integer.toHexString(data[ii] & 0xFF)).replace(' ', '0');
+                    if( ii != data.length-1)
+                        stringBuffer.append(s1 + ":");
+                    else
+                        stringBuffer.append(s1);
+            	}
+            	Log.i(TAG, stringBuffer.toString());
 
                 // DEBUG
                 switch (mAppStateTypeDef){

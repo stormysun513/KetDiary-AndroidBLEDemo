@@ -35,11 +35,4 @@ public interface BluetoothListener {
 
     /* Test plug is detected with its ID */
     void blePlugInserted(byte[] plugId);
-
-    /* Electrode state:
-    state: 0xFC=not yet conduct, 0xFD=1st is conducted, 2ed is conducted,
-    adcReading: 2 bytes
-     */
-
-    void bleElectrodeAdcReading(byte state, byte[] adcReading);
 }
