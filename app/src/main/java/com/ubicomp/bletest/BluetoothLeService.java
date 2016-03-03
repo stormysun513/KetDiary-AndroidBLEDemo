@@ -71,9 +71,7 @@ public class BluetoothLeService extends Service {
             "com.example.bluetooth.le.EXTRA_DATA";
 
     public static String HEART_RATE_MEASUREMENT = "00002a37-0000-1000-8000-00805f9b34fb";
-
-    public final static UUID UUID_HEART_RATE_MEASUREMENT =
-            UUID.fromString(HEART_RATE_MEASUREMENT);
+    public final static UUID UUID_HEART_RATE_MEASUREMENT = UUID.fromString(HEART_RATE_MEASUREMENT);
 
     // Implements callback methods for GATT events that the app cares about.  For example,
     // connection change and services discovered.

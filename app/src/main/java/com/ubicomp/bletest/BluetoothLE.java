@@ -18,15 +18,11 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.widget.Toast;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -38,11 +34,8 @@ import java.util.UUID;
 public class BluetoothLE {
 	private static final String TAG = "BluetoothLE";
 
-    // Base service UUID
     private static final UUID SERVICE3_UUID = UUID.fromString("713D0000-503E-4C75-BA94-3148F18D941E");
-    // Write UUID
     public static final UUID SERVICE3_WRITE_CHAR_UUID = UUID.fromString("713D0003-503E-4C75-BA94-3148F18D941E");
-	// Notification UUID
     private static final UUID SERVICE3_NOTIFICATION_CHAR_UUID = UUID.fromString("713D0002-503E-4C75-BA94-3148F18D941E");
 
     public final static byte BLE_REQUEST_DEVICE_ID = (byte)0x00;
@@ -52,14 +45,13 @@ public class BluetoothLE {
     public final static byte BLE_REQUEST_IMAGE_BY_INDEX = (byte)0x04;
     public final static byte BLE_END_IMAGE_TRANSFER = (byte)0x05;
     public final static byte BLE_DEREQUEST_SALIVA_VOLTAGE = (byte)0x06;
+    public final static byte BLE_SHUTDOWN = (byte)0x07;
 
 
     public final static byte BLE_REPLY_IMAGE_INFO = (byte)0x00;
     public final static byte BLE_REPLY_SALIVA_VOLTAGE = (byte)0x01;
     public final static byte BLE_REPLY_DEVICE_ID = (byte)0x02;
     public final static byte BLE_REPLY_IMAGE_PACKET = (byte)0x03;
-
-    private final static String dirName = "TempPicDir";
 
     public enum AppStateTypeDef {
         APP_FETCH_INFO,
@@ -91,7 +83,7 @@ public class BluetoothLE {
     private Runnable mRunnable;
     private boolean mScanning = false;
 
-    // Stops scanning after 10 seconds.
+    // Stops scanning after 15 seconds.
     private static final long SCAN_PERIOD = 15000;
     public AppStateTypeDef mAppStateTypeDef = AppStateTypeDef.APP_FETCH_INFO;
 
@@ -216,25 +208,21 @@ public class BluetoothLE {
 
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
             	byte[] data = intent.getByteArrayExtra(BluetoothLeService.EXTRA_DATA);
-            	
-            	StringBuffer stringBuffer = new StringBuffer("");
-            	for(int ii=0;ii<data.length;ii++){
-                    String s1 = String.format("%2s", Integer.toHexString(data[ii] & 0xFF)).replace(' ', '0');
-                    if( ii != data.length-1)
-                        stringBuffer.append(s1 + ":");
-                    else
-                        stringBuffer.append(s1);
-            	}
-            	Log.i(TAG, stringBuffer.toString());
 
                 // DEBUG
+//            	StringBuffer stringBuffer = new StringBuffer("");
+//            	for(int ii=0;ii<data.length;ii++){
+//                    String s1 = String.format("%2s", Integer.toHexString(data[ii] & 0xFF)).replace(' ', '0');
+//                    if( ii != data.length-1)
+//                        stringBuffer.append(s1 + ":");
+//                    else
+//                        stringBuffer.append(s1);
+//            	}
+//            	Log.i(TAG, stringBuffer.toString());
+
                 switch (mAppStateTypeDef){
                     case APP_IMAGE_RECEIVING:
-                        if(data[0] != BLE_REPLY_IMAGE_PACKET){
-//                            byte [] command = new byte[] {BluetoothLE.BLE_REQUEST_IMAGE_BY_INDEX, (byte)0x00};
-//                            bleWriteCharacteristic1(command);
-                        }
-                        else{
+                        if(data[0] == BLE_REPLY_IMAGE_PACKET){
                             if (mBluetoothDataParserService != null){
                                 mBluetoothDataParserService.parseDataPacket(data);
                             }
@@ -254,25 +242,20 @@ public class BluetoothLE {
                     {
                         switch(data[0]) { // Handling notification depending on types
                             case BLE_REPLY_DEVICE_ID:
-                                int deviceId = ((data[1] & 0xFF) << 8) + (data[2] & 0xFF);
+                                int cassetteId = ((data[1] & 0xFF) << 8) + (data[2] & 0xFF);
+                                int battVolt = ((data[3] & 0xFF) << 8) + (data[4] & 0xFF);
 
-                                int TemperatureSum = ((((data[3] & 0xFF) << 8) | (data[4] & 0xFF)) >> 4);
-                                double temperature = TemperatureSum*0.0625;
-
-                                ((MainActivity) activity).setCasecatteId(deviceId);
-                                ((MainActivity) activity).setBatteryLevel((float)temperature);
-                                if(MainActivity.mDisplayTypeDef == MainActivity.DisplayTypeDef.DISPLAY_DEVICE_ID)
-                                    ((MainActivity) activity).updateTextViewInfo("ket_" + String.valueOf(deviceId));
-                                else if(MainActivity.mDisplayTypeDef == MainActivity.DisplayTypeDef.DISPLAY_BATTERY){
-                                    ((MainActivity) activity).updateTextViewInfo("Temp:" + String.format("%.2f", temperature));
+                                if(cassetteId == 0xFFFF){
+                                    ((BluetoothListener) activity).bleNoPlugDetected();
                                 }
-
+                                else{
+                                    ((BluetoothListener) activity).blePlugInserted(cassetteId);
+                                }
+                                ((BluetoothListener) activity).bleUpdateBattLevel(battVolt);
                                 break;
                             case BLE_REPLY_SALIVA_VOLTAGE:
                                 int value = ((data[1] & 0xFF) << 8) + (data[2] & 0xFF);
-                                ((MainActivity) activity).setSalivaVoltage(value);
-                                if(MainActivity.mDisplayTypeDef == MainActivity.DisplayTypeDef.DISPLAY_VOLTAGE)
-                                    ((MainActivity) activity).updateTextViewInfo("Voltage:"+String.valueOf(value));
+                                ((BluetoothListener) activity).bleUpdateSalivaVolt(value);
                                 break;
                         }
                         break;
@@ -285,7 +268,7 @@ public class BluetoothLE {
                 terminatePacketParser();
 
                 byte[] data = intent.getByteArrayExtra(BluetoothDataParserService.EXTRA_IMAGE_DATA);
-                new UpdataUIAsyncTask().execute(data);
+                new updateUIAsyncTask().execute(data);
             }
             else if (BluetoothDataParserService.ACTION_IMAGE_HEADER_CHECKED.equals(action)){
                 mAppStateTypeDef = AppStateTypeDef.APP_IMAGE_RECEIVING;
@@ -337,7 +320,7 @@ public class BluetoothLE {
         }
         else {
             if(mScanning){
-                Log.d(TAG, "Stop previous handler");
+//                Log.d(TAG, "Stop previous handler");
                 mBluetoothAdapter.stopLeScan(mLeScanCallback);
                 mHandler.removeCallbacks(mRunnable);
             }
@@ -427,7 +410,7 @@ public class BluetoothLE {
                     // Bluetooth is now enabled, enable BLE scan
                     bleScan();
                 } else{
-                    // User did not enable Bluetooth or an error occured
+                    // User did not enable Bluetooth or an error occurred
                     Toast.makeText(activity, "Bluetooth did not enable!", Toast.LENGTH_SHORT).show();
 //                activity.finish();
                 }
@@ -455,7 +438,7 @@ public class BluetoothLE {
 
                     String scannedName = device.getName();
                     if(device.getName() == null){
-                        BLEAdvertisedData badData = new BLEUtil().parseAdertisedData(scanRecord);
+                        BLEAdvertisedData badData = new BLEUtil().parseAdvertisedData(scanRecord);
                         scannedName = badData.getName();
                     }
 
@@ -476,11 +459,11 @@ public class BluetoothLE {
 
     final public class BLEUtil {
 
-        public BLEAdvertisedData parseAdertisedData(byte[] advertisedData) {
-            List<UUID> uuids = new ArrayList<UUID>();
+        public BLEAdvertisedData parseAdvertisedData(byte[] advertisedData) {
+            List<UUID> Uuids = new ArrayList<UUID>();
             String name = null;
             if( advertisedData == null ){
-                return new BLEAdvertisedData(uuids, name);
+                return new BLEAdvertisedData(Uuids, name);
             }
 
             ByteBuffer buffer = ByteBuffer.wrap(advertisedData).order(ByteOrder.LITTLE_ENDIAN);
@@ -494,7 +477,7 @@ public class BluetoothLE {
                     case 0x02: // Partial list of 16-bit UUIDs
                     case 0x03: // Complete list of 16-bit UUIDs
                         while (length >= 2) {
-                            uuids.add(UUID.fromString(String.format(
+                            Uuids.add(UUID.fromString(String.format(
                                     "%08x-0000-1000-8000-00805f9b34fb", buffer.getShort())));
                             length -= 2;
                         }
@@ -504,7 +487,7 @@ public class BluetoothLE {
                         while (length >= 16) {
                             long lsb = buffer.getLong();
                             long msb = buffer.getLong();
-                            uuids.add(new UUID(msb, lsb));
+                            Uuids.add(new UUID(msb, lsb));
                             length -= 16;
                         }
                         break;
@@ -522,7 +505,7 @@ public class BluetoothLE {
                         break;
                 }
             }
-            return new BLEAdvertisedData(uuids, name);
+            return new BLEAdvertisedData(Uuids, name);
         }
     }
 
@@ -542,32 +525,12 @@ public class BluetoothLE {
         }
     }
 
-    public class UpdataUIAsyncTask extends AsyncTask<byte[], Void, byte[]>{
+    public class updateUIAsyncTask extends AsyncTask<byte[], Void, byte[]>{
 
         @Override
         protected byte[] doInBackground(byte[]... bytes) {
-            File mainStorage;
-            File file;
-            FileOutputStream fos;
-
-            if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED))
-                mainStorage = new File(Environment.getExternalStorageDirectory(), dirName);
-            else
-                mainStorage = new File(activity.getApplicationContext().getFilesDir(), dirName);
-
-            if (!mainStorage.exists())
-                mainStorage.mkdirs();
-
-            Long tsLong = System.currentTimeMillis()/1000;
-            file = new File(mainStorage, "PIC_".concat(String.valueOf(tsLong.toString())).concat(".jpg"));
-
-            try {
-                fos = new FileOutputStream(file, true);
-                fos.write(bytes[0]);
-                fos.close();
-            } catch (IOException e) {
-                Log.d(TAG, "FAIL TO OPEN FILES: " + file.getAbsolutePath());
-            }
+            ImageDetection imageDetection = new ImageDetection(activity, bytes[0]);
+            imageDetection.detectImageResult();
             return bytes[0];
         }
 
@@ -575,9 +538,9 @@ public class BluetoothLE {
         protected void onPostExecute(byte[] result)
         {
             super.onPostExecute(result);
-            //    將doInBackground方法返回的 byte[] 解碼成要給Bitmap
+            //  Process returned byte[] from doInBackground into Bitmap
             Bitmap bitmap = BitmapFactory.decodeByteArray(result, 0, result.length);
-            //    更新我們的 ImageView 控件
+            // Refresh ImageView
             if(bitmap == null){
                 Log.d(TAG, "Image corrupted during dat transmission!");
             }

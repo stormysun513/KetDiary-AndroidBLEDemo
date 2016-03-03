@@ -19,7 +19,7 @@ gen/
 local.properties
 
 # Windows thumbnail db
-Thumbs.db
+/**/Thumbs.db
 
 # OSX files
 /**/.DS_Store
@@ -31,9 +31,14 @@ Thumbs.db
 # Android Studio
 *.iml
 .idea
-#.idea/workspace.xml - remove # and delete .idea if it better suit your needs.
+# .idea/workspace.xml - remove # and delete .idea if it better suit your needs.
 .gradle/
 /**/build/
 
-#NDK
+# Object files
 obj/
+
+# External libraries
+app/libs/
+app/src/main/jniLibs/
+openCVLibrary300/

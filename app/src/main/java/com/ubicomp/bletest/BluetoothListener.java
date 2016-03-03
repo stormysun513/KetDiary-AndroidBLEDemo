@@ -3,6 +3,7 @@ package com.ubicomp.bletest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 
 public interface BluetoothListener {
 
@@ -31,8 +32,24 @@ public interface BluetoothListener {
     void bleWriteStateFail();
 
     /* Can not detect test plug */
-    void bleNoPlug();
+    void bleNoPlugDetected();
 
     /* Test plug is detected with its ID */
-    void blePlugInserted(byte[] plugId);
+    void blePlugInserted(int cassetteId);
+
+    /* Update battery level */
+    void bleUpdateBattLevel(int battVolt);
+
+    /* Notify device information */
+    void notifyDeviceVersion(int version);
+
+    /* Update saliva voltage */
+    void bleUpdateSalivaVolt(int salivaVolt);
+
+    /* Image is retrieved successfully */
+    void bleGetImageSuccess(Bitmap bitmap);
+
+    /* Failed to retrieve image */
+    void bleGetImageFailure(float dropoutRate);
+
 }

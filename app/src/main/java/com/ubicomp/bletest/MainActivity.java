@@ -14,6 +14,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.opencv.android.OpenCVLoader;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,19 +42,24 @@ public class MainActivity extends Activity implements BluetoothListener {
         DISPLAY_NONE,
         DISPLAY_VOLTAGE,
         DISPLAY_BATTERY,
-        DISPLAY_DEVICE_ID
+        DISPLAY_CASSETTE_ID,
+        DISPLAY_DEVICE_INFO
     }
 
     private int casecatteId = 0xFFFF;
-    private float salivaVoltage = 0xFFFF;
-    private float batteryLevel = 0xFFFF;
+    private int salivaVoltage = 0xFFFF;
+    private int batteryLevel = 0xFFFF;
 
     public static DisplayTypeDef mDisplayTypeDef = DisplayTypeDef.DISPLAY_NONE;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
+        super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+        if(!OpenCVLoader.initDebug()){
+            // Do something
+            Log.d(TAG, "Fail to load opencv module.");
+        }
 
         editTextBlock = (EditText)findViewById(R.id.editTextBlock);
         textViewInfo = (TextView)findViewById(R.id.textViewInfo);
@@ -72,8 +79,9 @@ public class MainActivity extends Activity implements BluetoothListener {
             @Override
             public void onClick(View v) {
                 if (ble != null && buttonSwitch.getText().toString().equals(getString(R.string.button_close))){
+                    byte[] command = new byte[]{BluetoothLE.BLE_SHUTDOWN};
                     ble.setManualDisconnectFlag(true);
-                    ble.bleDisconnect();
+                    ble.bleWriteCharacteristic1(command);
                     ble = null;
                 }
                 else if(ble == null && buttonSwitch.getText().toString().equals(getString(R.string.button_start))){
@@ -205,10 +213,11 @@ public class MainActivity extends Activity implements BluetoothListener {
 
             @Override
             public void onClick(View view) {
-                mDisplayTypeDef = DisplayTypeDef.DISPLAY_DEVICE_ID;
-                if(casecatteId != 0xFFFF){
-                    updateTextViewInfo("ket_"+String.valueOf(casecatteId));
-                }
+                mDisplayTypeDef = DisplayTypeDef.DISPLAY_CASSETTE_ID;
+                if(casecatteId != 0xFFFF)
+                    updateTextViewInfo("Case_"+String.valueOf(casecatteId));
+                else
+                    updateTextViewInfo("No Cassette!");
             }
         });
 
@@ -255,11 +264,10 @@ public class MainActivity extends Activity implements BluetoothListener {
             public void onClick(View view) {
                 mDisplayTypeDef = DisplayTypeDef.DISPLAY_BATTERY;
                 if(batteryLevel != 0xFFFF){
-                    updateTextViewInfo("Temp:" + String.format("%.2f", batteryLevel));
+                    updateTextViewInfo("Battery:" + String.valueOf(batteryLevel));
                 }
             }
         });
-
         Log.d(TAG, "On create");
     }
 
@@ -346,15 +354,45 @@ public class MainActivity extends Activity implements BluetoothListener {
     }
 
     @Override
-    public void bleNoPlug() {
-    	Toast.makeText(this, "No test plug", Toast.LENGTH_SHORT).show();
-        Log.d(TAG, "No test plug");
+    public void bleNoPlugDetected() {
+        if(MainActivity.mDisplayTypeDef == MainActivity.DisplayTypeDef.DISPLAY_CASSETTE_ID)
+            updateTextViewInfo("No Cassette!");
     }
 
     @Override
-    public void blePlugInserted(byte[] plugId) {
-    	//Toast.makeText(this, "Test plug is inserted", Toast.LENGTH_SHORT).show();
-        Log.d(TAG, "Test plug is inserted");
+    public void blePlugInserted(int cassetteId) {
+        setCassetteId(cassetteId);
+        if(MainActivity.mDisplayTypeDef == MainActivity.DisplayTypeDef.DISPLAY_CASSETTE_ID)
+            updateTextViewInfo("Case_" + String.valueOf(cassetteId));
+    }
+
+    @Override
+    public void bleUpdateBattLevel(int battVolt) {
+        setBatteryLevel(battVolt);
+        if(MainActivity.mDisplayTypeDef == MainActivity.DisplayTypeDef.DISPLAY_BATTERY)
+            updateTextViewInfo("Battery:" + String.valueOf(battVolt));
+    }
+
+    @Override
+    public void notifyDeviceVersion(int version) {
+
+    }
+
+    @Override
+    public void bleUpdateSalivaVolt(int salivaVolt) {
+        setSalivaVoltage(salivaVolt);
+        if(MainActivity.mDisplayTypeDef == MainActivity.DisplayTypeDef.DISPLAY_VOLTAGE)
+            updateTextViewInfo("Voltage:"+String.valueOf(salivaVolt));
+    }
+
+    @Override
+    public void bleGetImageSuccess(Bitmap bitmap) {
+
+    }
+
+    @Override
+    public void bleGetImageFailure(float dropoutRate) {
+
     }
 
     public void updateTextViewInfo(String string){
@@ -371,9 +409,9 @@ public class MainActivity extends Activity implements BluetoothListener {
 
     public void clearImageViewPreview(){imageViewPreview.setImageDrawable(null);}
 
-    public void setCasecatteId(int id) { casecatteId = id;}
+    public void setCassetteId(int id) { casecatteId = id;}
 
-    public void setBatteryLevel(float voltage) {batteryLevel = voltage;}
+    public void setBatteryLevel(int voltage) {batteryLevel = voltage;}
 
-    public void setSalivaVoltage(float voltage) {salivaVoltage = voltage;}
+    public void setSalivaVoltage(int voltage) {salivaVoltage = voltage;}
 }

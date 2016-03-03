@@ -20,4 +20,6 @@ android {
 
 dependencies {
     compile 'com.android.support:support-v4:21.0.3'
+    compile project(':openCVLibrary300')
+    compile files('libs/libsvm.jar')
 }
