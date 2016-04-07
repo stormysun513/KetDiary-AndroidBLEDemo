@@ -114,7 +114,7 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/buttonGetId"
+                android:id="@+id/buttonDisplayId"
                 android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="GetId"
@@ -132,6 +132,35 @@
                 android:layout_width="120dp"
                 android:layout_height="wrap_content"
                 android:text="Battery"
+                android:layout_alignParentRight="true"/>
+
+        </RelativeLayout>
+
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/buttonDisconnect"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Disconnect"
+                android:layout_alignParentLeft="true"/>
+
+            <Button
+                android:id="@+id/buttonUnlock"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Unlock"
+                android:layout_centerHorizontal="true"/>
+
+            <Button
+                android:id="@+id/buttonDummy2"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Dummy2"
                 android:layout_alignParentRight="true"/>
 
         </RelativeLayout>

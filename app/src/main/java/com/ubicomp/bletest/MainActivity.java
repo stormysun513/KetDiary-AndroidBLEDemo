@@ -34,16 +34,17 @@ public class MainActivity extends Activity implements BluetoothListener {
     private Button buttonGetSalivaVoltage;
     private Button buttonDeMonitor;
     private Button buttonNotification;
-    private Button buttonGetId;
+    private Button buttonDisplayId;
     private Button buttonWriteId;
     private Button buttonBattery;
+    private Button buttonDisconnect;
+    private Button buttonUnlock;
 
     public enum DisplayTypeDef{
         DISPLAY_NONE,
         DISPLAY_VOLTAGE,
         DISPLAY_BATTERY,
-        DISPLAY_CASSETTE_ID,
-        DISPLAY_DEVICE_INFO
+        DISPLAY_CASSETTE_ID
     }
 
     private int casecatteId = 0xFFFF;
@@ -70,18 +71,18 @@ public class MainActivity extends Activity implements BluetoothListener {
         buttonGetSalivaVoltage = (Button)findViewById(R.id.buttonGetSalivaVoltage);
         buttonDeMonitor = (Button)findViewById(R.id.buttonDeMonitor);
         buttonNotification = (Button)findViewById(R.id.buttonNotification);
-        buttonGetId = (Button)findViewById(R.id.buttonGetId);
+        buttonDisplayId = (Button)findViewById(R.id.buttonDisplayId);
         buttonWriteId = (Button)findViewById(R.id.buttonWriteId);
         buttonBattery = (Button)findViewById(R.id.buttonBattery);
+        buttonDisconnect = (Button)findViewById(R.id.buttonDisconnect);
+        buttonUnlock = (Button)findViewById(R.id.buttonUnlock);
 
         buttonSwitch.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View v) {
                 if (ble != null && buttonSwitch.getText().toString().equals(getString(R.string.button_close))){
-                    byte[] command = new byte[]{BluetoothLE.BLE_SHUTDOWN};
-                    ble.setManualDisconnectFlag(true);
-                    ble.bleWriteCharacteristic1(command);
+                    ble.bleHardTermination();
                     ble = null;
                 }
                 else if(ble == null && buttonSwitch.getText().toString().equals(getString(R.string.button_start))){
@@ -155,9 +156,7 @@ public class MainActivity extends Activity implements BluetoothListener {
                 if(ble == null)
                     return;
 
-                byte [] command = new byte[] {BluetoothLE.BLE_REQUEST_IMAGE_INFO};
-                ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_IMAGE_GET_HEADER;
-                ble.bleWriteCharacteristic1(command);
+                ble.bleTakePicture();
             }
         });
 
@@ -173,9 +172,7 @@ public class MainActivity extends Activity implements BluetoothListener {
                     updateTextViewInfo("Voltage:"+String.valueOf(salivaVoltage));
                 }
 
-                byte[] command = new byte[]{BluetoothLE.BLE_REQUEST_SALIVA_VOLTAGE};
-                ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
-                ble.bleWriteCharacteristic1(command);
+                ble.bleRequestSalivaNotification();
             }
         });
 
@@ -188,11 +185,7 @@ public class MainActivity extends Activity implements BluetoothListener {
 
                 mDisplayTypeDef = DisplayTypeDef.DISPLAY_NONE;
                 updateTextViewInfo("");
-
-
-                byte[] command = new byte[]{BluetoothLE.BLE_DEREQUEST_SALIVA_VOLTAGE};
-                ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
-                ble.bleWriteCharacteristic1(command);
+                ble.bleDerequestSalivaVoltage();
             }
         });
 
@@ -203,19 +196,17 @@ public class MainActivity extends Activity implements BluetoothListener {
                 if (ble == null)
                     return;
 
-                byte[] command = new byte[]{BluetoothLE.BLE_REQUEST_DEVICE_ID};
-                ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
-                ble.bleWriteCharacteristic1(command);
+                ble.bleRequestCassetteInfo();
             }
         });
 
-        buttonGetId.setOnClickListener(new View.OnClickListener(){
+        buttonDisplayId.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View view) {
                 mDisplayTypeDef = DisplayTypeDef.DISPLAY_CASSETTE_ID;
-                if(casecatteId != 0xFFFF)
-                    updateTextViewInfo("Case_"+String.valueOf(casecatteId));
+                if (casecatteId != 0xFFFF)
+                    updateTextViewInfo("Case_" + String.valueOf(casecatteId));
                 else
                     updateTextViewInfo("No Cassette!");
             }
@@ -268,6 +259,27 @@ public class MainActivity extends Activity implements BluetoothListener {
                 }
             }
         });
+
+        buttonDisconnect.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View view) {
+                if(ble != null){
+                    ble.bleSelfDisconnection();
+                }
+            }
+        });
+
+        buttonUnlock.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View view) {
+                if(ble != null){
+                    ble.bleUnlockDevice();
+                }
+            }
+        });
+
         Log.d(TAG, "On create");
     }
 
@@ -275,8 +287,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     public boolean onKeyDown(int keyCode, KeyEvent event)
     {
 
-        if (keyCode == KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0)
-        {
+        if (keyCode == KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0) {
             this.moveTaskToBack(true);
             return true;
         }
@@ -288,7 +299,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     protected void onDestroy() {
         super.onDestroy();
         if(ble != null) {
-            ble.bleDisconnect();
+            ble.bleSelfDisconnection();
         }
     }
 
@@ -305,7 +316,7 @@ public class MainActivity extends Activity implements BluetoothListener {
 
     @Override
     public void bleNotSupported() {
-        Toast.makeText(activity, "BLE not supported!", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "BLE not supported!", Toast.LENGTH_SHORT).show();
 //        this.finish();
     }
 
@@ -313,6 +324,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     public void bleConnectionTimeout() {
         Toast.makeText(this, "BLE connection timeout", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "BLE connection timeout");
+        // Will be handled in the future ... Larry
         if(ble != null) {
             ble = null;
         }
@@ -330,6 +342,7 @@ public class MainActivity extends Activity implements BluetoothListener {
 
     @Override
     public void bleDisconnected() {
+        // Will be handled in the future ... Larry
     	Toast.makeText(this, "BLE disconnected", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "BLE disconnected");
         buttonSwitch.setText(getString(R.string.button_start));
@@ -387,12 +400,24 @@ public class MainActivity extends Activity implements BluetoothListener {
 
     @Override
     public void bleGetImageSuccess(Bitmap bitmap) {
-
+        updateImageViewPreview(bitmap);
+        Log.d(TAG, "Received image successfully.");
     }
 
     @Override
     public void bleGetImageFailure(float dropoutRate) {
+        updateTextViewInfo("Dropout:" + String.format("%.1f", 100*(1-dropoutRate)) + "%" );
+        Log.d(TAG, "Can not retrieve data.");
+    }
 
+    @Override
+    public void bleNotifyDetectionResult(double score) {
+        if(score == -1)
+            updateTextViewInfo("Negative!");
+        else
+            updateTextViewInfo("Positive!");
+
+        Log.d(TAG, "Display Result.");
     }
 
     public void updateTextViewInfo(String string){

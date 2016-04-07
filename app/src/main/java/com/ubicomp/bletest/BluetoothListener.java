@@ -9,9 +9,9 @@ public interface BluetoothListener {
 
     Context getContext();
 
-	public Activity activity = null;
+//	public Activity activity = null;
 	
-    void onActivityResult(int requestCode, int resultCode, Intent data);
+//    void onActivityResult(int requestCode, int resultCode, Intent data);
 
     /* BLE is not supported in this device */
     void bleNotSupported();
@@ -51,5 +51,8 @@ public interface BluetoothListener {
 
     /* Failed to retrieve image */
     void bleGetImageFailure(float dropoutRate);
+
+    /* Notify detection result */
+    void bleNotifyDetectionResult(double score);
 
 }

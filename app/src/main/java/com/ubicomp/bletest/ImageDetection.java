@@ -18,10 +18,16 @@ import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Created by larry on 2/29/16.
@@ -29,22 +35,20 @@ import java.util.Date;
 public class ImageDetection {
     private static final String TAG = "ImageDetection";
 
-    private static final int SEARCH_REGION_X_MIN = 110;
-    private static final int SEARCH_REGION_X_MAX = 190;
-    private static final int SEARCH_REGION_Y_MIN = 0;
-    private static final int SEARCH_REGION_Y_MAX = 240;
+    private static final int SEARCH_REGION_X_MIN = 165;
+    private static final int SEARCH_REGION_X_MAX = 220;
+    private static final int SEARCH_REGION_Y_MIN = 60;
+    private static final int SEARCH_REGION_Y_MAX = 200;
 
-    private static final int DEFAULT_X_MIN = 127;
-    private static final int DEFAULT_X_MAX = 187;
-    private static final int DEFAULT_Y_MIN = 25;
-    private static final int DEFAULT_Y_MAX = 195;
+    private static final int DEFAULT_X_MIN = 175;
+    private static final int DEFAULT_X_MAX = 205;   //30
+    private static final int DEFAULT_Y_MIN = 70;
+    private static final int DEFAULT_Y_MAX = 197;   //127
 
-    private static final int ROI_LENGTH = 60;
-    private static final int ROI_WIDTH = 170;
+    private static final int ROI_LENGTH = 30;
+    private static final int ROI_WIDTH = 127;
 
-    private static final int WHITE_THRESHOLD = 160;
-    private static final int VALID_THRESHOLD = -15;
-    private static final int MINIMAL_EFFECTIVE_RANGE = 20;
+    private static final int WHITE_THRESHOLD = 220;
 
     private int xmin = DEFAULT_X_MIN;
     private int xmax = DEFAULT_X_MAX;
@@ -58,16 +62,20 @@ public class ImageDetection {
 
     Activity activity = null;
     byte[] data = null;
+    modified_svm_scale svm_scale = null;
+    modified_svm_predict svm_predict = null;
 
     File model_directory = null;
     File result_directory = null;
     Long timestamp = null;
 
-    private final static String model_directory_name = "DetectionParameters";
-    private final static String result_directory_name = "DetectionResult";
+    private static final String model_directory_name = "DetectionParameters";
+    private static final String result_directory_name = "DetectionResult";
 
-    private final static String model_name = "model.out";
-    private final static String scale_param_name = "scale_param.out";
+    private static final String svm_model_name = "model.out";
+    private static final String scale_param_name = "scale_param.out";
+    private static final String debug_feature_name = "input_raw_debug.libsvm";
+    private static final String predict_out_name = "predict.out";
 
     public ImageDetection(Activity activity, byte[] data) {
 
@@ -96,41 +104,75 @@ public class ImageDetection {
 
         if (!result_directory.exists())
             result_directory.mkdirs();
+
+        svm_scale = new modified_svm_scale();
+        svm_predict = new modified_svm_predict();
+    }
+
+    public void setDataBuffer(byte[] data){
+        this.data = data;
     }
 
     public boolean checkSVMModel() {
+        boolean result = false;
+
         File check = new File(model_directory, scale_param_name);
         if (!check.exists()){
-            // TODO: Syncronize model files from the server
+            // TODO : Syncronize model files from the server
         }
         else {
-            Date lastModDate = new Date(check.lastModified());
+            Date dateLastModified = new Date(check.lastModified());
+            Date dateOnServer = null;
+            // TODO : Compare the date, if the local model is not latest, download the new one.
         }
 
-        return true;
+        return result;
     }
 
-    public boolean detectImageResult() {
+    public double detectImageResult() throws IOException{
 
+        double result = Double.MIN_VALUE;
         if(this.data == null)
-            return false;
+            return result;
 
         String name = "PIC_".concat(String.valueOf(timestamp.toString())).concat("_0.jpg");
-        File file = new File(result_directory, name);
+        File file_save_path = new File(result_directory, name);
         FileOutputStream fos;
         try {
-            fos = new FileOutputStream(file, true);
+            fos = new FileOutputStream(file_save_path, true);
             fos.write(data);
             fos.close();
         } catch (IOException e) {
-            Log.d(TAG, "FAIL TO WRITE FILE : " + file.getAbsolutePath());
+            Log.d(TAG, "FAIL TO WRITE FILE : " + file_save_path.getAbsolutePath());
         }
+
 
         Bitmap bitmap_orig = BitmapFactory.decodeByteArray(data, 0, data.length);
         Mat mat_cropped = getROIRegionMat(bitmap_orig);
+        File scale_param_path = new File(model_directory, scale_param_name);
+        String image_svm_feat = imageToSvmFeat(mat_cropped);          // Close for DEBUG
 
-        String image_svm_feat = imageToSvmFeat(mat_cropped);
-        return true;
+        // DEBUG : fake data used for svm input to make sure the match of feature dimension
+//        File debug_feature_path = new File(model_directory, debug_feature_name);
+//        BufferedReader fp = new BufferedReader(new FileReader(debug_feature_path));
+//        String line = fp.readLine();
+//		fp.close();
+//        String output = svm_scale.svm_scale(scale_param_path.toString(), line);
+        // End of DEBUG
+
+        // SVM detection
+        String output = svm_scale.svm_scale(scale_param_path.toString(), image_svm_feat); // Close for DEBUG
+        File predict_out_path = new File(result_directory, predict_out_name);
+        File svm_model_path = new File(model_directory, svm_model_name);
+        DataOutputStream data_out_stream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(predict_out_path)));
+
+        if(!svm_predict.isModelLoaded())
+            svm_predict.loadModel(svm_model_path.toString());
+
+        result = svm_predict.predict(output, data_out_stream, 1);
+        data_out_stream.close();
+
+        return result;
     }
 
     private Mat getROIRegionMat(Bitmap bitmap){
@@ -159,6 +201,14 @@ public class ImageDetection {
             ymin = yCenter - (ROI_WIDTH/2);
             ymax = yCenter + (ROI_WIDTH/2);
         }
+
+        if(xmin < 0 || ymin < 0 || xmax >= 320 || ymax >= 240){
+            xmin = DEFAULT_X_MIN;
+            xmax = DEFAULT_X_MAX;
+            ymin = DEFAULT_Y_MIN;
+            ymax = DEFAULT_Y_MAX;
+        }
+
         Log.i(TAG, "xmin: " + xmin + ", xmax: " + xmax + ", ymin: " + ymin + ", ymax: " + ymax);
 
         Mat mat_orig = new Mat();
@@ -204,42 +254,48 @@ public class ImageDetection {
 
     private String imageToSvmFeat(Mat mat_cropped){
 
-        Mat mat_resized = new Mat();
-        Size sz = new Size(mat_cropped.cols()*COMPACT_RATIO, mat_cropped.rows()*COMPACT_RATIO);
-        Imgproc.resize(mat_cropped, mat_resized, sz);
+        int beginCol = mat_cropped.cols()/15;
+        int halfCol = mat_cropped.cols()/4 + 1;
+        Rect rect_roi = new Rect(beginCol, 0, halfCol, mat_cropped.rows());
+        Mat mat_test = new Mat(mat_cropped, rect_roi);
         mat_cropped.release();
 
-        Mat mat_canny = new Mat();
-        Imgproc.Canny(mat_resized, mat_canny, CANNY_THRES1, CANNY_THRES2);
+        List<Mat> vmat_resized = new ArrayList<Mat>();
+        Core.split(mat_test, vmat_resized); 			// B, G, R
 
-        int halfCol = mat_resized.cols()/2 + 1;
-        Rect rect_roi = new Rect(0, 0, halfCol, mat_resized.rows());
-        Mat mat_feat_1 = new Mat(mat_resized, rect_roi);
-        Mat mat_feat_2 = new Mat(mat_canny, rect_roi);
+        Mat mat_canny0 = new Mat();
+        Mat mat_canny2 = new Mat();
 
-        byte [] bytes_feat_1 = new byte[mat_feat_1.cols()*mat_feat_1.rows()*mat_feat_1.channels()];
-        mat_feat_1.get(0, 0, bytes_feat_1);
+        Imgproc.Canny(vmat_resized.get(0), mat_canny0, CANNY_THRES1, CANNY_THRES2);
+        Imgproc.Canny(vmat_resized.get(2), mat_canny2, CANNY_THRES1, CANNY_THRES2);
 
-        byte [] bytes_feat_2 = new byte[mat_feat_2.cols()*mat_feat_2.rows()];
+        Mat mat_feat_0 = new Mat();
+        Mat mat_feat_2 = new Mat();
+        Imgproc.Sobel(mat_canny0, mat_feat_0, Imgcodecs.IMREAD_GRAYSCALE, 1, 0);
+        Imgproc.Sobel(mat_canny2, mat_feat_2, Imgcodecs.IMREAD_GRAYSCALE, 1, 0);
+        mat_canny0.release();
+        mat_canny2.release();
+
+        int count0 = 0, count2 = 0;
+
+        byte [] bytes_feat_0 = new byte[mat_feat_0.cols()*mat_feat_0.rows()*mat_feat_0.channels()];
+        mat_feat_0.get(0, 0, bytes_feat_0);
+        mat_feat_0.release();
+        for(byte b: bytes_feat_0){
+            if(b != 0)
+                count0++;
+        }
+
+
+        byte [] bytes_feat_2 = new byte[mat_feat_2.cols()*mat_feat_2.rows()*mat_feat_2.channels()];
         mat_feat_2.get(0, 0, bytes_feat_2);
-
-        String image_svm_feat = String.valueOf(-1) + " ";
-
-        int index = 1;
-        for(int i = 0; i < bytes_feat_1.length; i++){
-            int value = 0xFF & bytes_feat_1[i];
-            image_svm_feat += (String.valueOf(index++) + ":" + String.valueOf(value) + " ");
+        mat_feat_2.release();
+        for(byte b:bytes_feat_2){
+            if(b != 0)
+                count2++;
         }
 
-        for(int i = 0; i < bytes_feat_2.length; i++){
-            int value = 0xFF & bytes_feat_2[i];
-            image_svm_feat += (String.valueOf(index++) + ":" + String.valueOf(value) + " ");
-        }
-
+        String image_svm_feat = -1 + " 1:" + count0 + " " + "2:" + count2 ;
         return image_svm_feat;
-    }
-
-    public float getDetectionResults(){
-        return -1f;
     }
 }
