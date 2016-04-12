@@ -1,4 +1,4 @@
-package com.ubicomp.bletest;
+package com.ubicomp.mybletest;
 
 import android.app.Service;
 import android.content.Intent;

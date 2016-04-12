@@ -1,4 +1,4 @@
-package com.ubicomp.bletest;
+package com.ubicomp.mybletest;
 
 import android.app.Activity;
 import android.content.Context;
@@ -39,6 +39,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     private Button buttonBattery;
     private Button buttonDisconnect;
     private Button buttonUnlock;
+    private Button buttonVersion;
 
     public enum DisplayTypeDef{
         DISPLAY_NONE,
@@ -47,7 +48,7 @@ public class MainActivity extends Activity implements BluetoothListener {
         DISPLAY_CASSETTE_ID
     }
 
-    private int casecatteId = 0xFFFF;
+    private int cassetteId = 0xFFFF;
     private int salivaVoltage = 0xFFFF;
     private int batteryLevel = 0xFFFF;
 
@@ -59,7 +60,7 @@ public class MainActivity extends Activity implements BluetoothListener {
 		setContentView(R.layout.activity_main);
         if(!OpenCVLoader.initDebug()){
             // Do something
-            Log.d(TAG, "Fail to load opencv module.");
+            Log.d(TAG, "Fail to load OpenCV module.");
         }
 
         editTextBlock = (EditText)findViewById(R.id.editTextBlock);
@@ -76,6 +77,7 @@ public class MainActivity extends Activity implements BluetoothListener {
         buttonBattery = (Button)findViewById(R.id.buttonBattery);
         buttonDisconnect = (Button)findViewById(R.id.buttonDisconnect);
         buttonUnlock = (Button)findViewById(R.id.buttonUnlock);
+        buttonVersion = (Button)findViewById(R.id.buttonVersion);
 
         buttonSwitch.setOnClickListener(new View.OnClickListener() {
 
@@ -205,8 +207,8 @@ public class MainActivity extends Activity implements BluetoothListener {
             @Override
             public void onClick(View view) {
                 mDisplayTypeDef = DisplayTypeDef.DISPLAY_CASSETTE_ID;
-                if (casecatteId != 0xFFFF)
-                    updateTextViewInfo("Case_" + String.valueOf(casecatteId));
+                if (cassetteId != 0xFFFF)
+                    updateTextViewInfo("Case_" + String.valueOf(cassetteId));
                 else
                     updateTextViewInfo("No Cassette!");
             }
@@ -243,7 +245,7 @@ public class MainActivity extends Activity implements BluetoothListener {
                 byte dataByte1 = (byte) ((sum >> 8) & 0xFF);
                 byte dataByte2 = (byte) (sum & 0xFF);
 
-                byte[] command = new byte[]{BluetoothLE.BLE_CHANGE_DEVICE_ID, dataByte1, dataByte2};
+                byte[] command = new byte[]{BluetoothLE.BLE_CHANGE_CASSETTE_ID, dataByte1, dataByte2};
                 ble.mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
                 ble.bleWriteCharacteristic1(command);
             }
@@ -276,6 +278,16 @@ public class MainActivity extends Activity implements BluetoothListener {
             public void onClick(View view) {
                 if(ble != null){
                     ble.bleUnlockDevice();
+                }
+            }
+        });
+
+        buttonVersion.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View view) {
+                if(ble != null){
+                    ble.bleRequestDeviceInfo();
                 }
             }
         });
@@ -349,7 +361,7 @@ public class MainActivity extends Activity implements BluetoothListener {
         if(ble != null) {
             ble = null;
         }
-        casecatteId = 0xFFFF;
+        cassetteId = 0xFFFF;
         salivaVoltage = 0xFFFF;
         batteryLevel = 0xFFFF;
     }
@@ -414,10 +426,18 @@ public class MainActivity extends Activity implements BluetoothListener {
     public void bleNotifyDetectionResult(double score) {
         if(score == -1)
             updateTextViewInfo("Negative!");
-        else
+        else if(score == 1)
             updateTextViewInfo("Positive!");
+        else if(score == -1000)
+            updateTextViewInfo("Invalid!");
 
         Log.d(TAG, "Display Result.");
+    }
+
+    @Override
+    public void bleReturnDeviceVersion(int version) {
+        updateTextViewInfo("Version : " + String.valueOf(version));
+        Log.d(TAG, "Get version.");
     }
 
     public void updateTextViewInfo(String string){
@@ -434,7 +454,7 @@ public class MainActivity extends Activity implements BluetoothListener {
 
     public void clearImageViewPreview(){imageViewPreview.setImageDrawable(null);}
 
-    public void setCassetteId(int id) { casecatteId = id;}
+    public void setCassetteId(int id) { cassetteId = id;}
 
     public void setBatteryLevel(int voltage) {batteryLevel = voltage;}
 

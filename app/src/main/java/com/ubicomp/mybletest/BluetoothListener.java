@@ -1,8 +1,6 @@
-package com.ubicomp.bletest;
+package com.ubicomp.mybletest;
 
-import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Bitmap;
 
 public interface BluetoothListener {
@@ -54,5 +52,7 @@ public interface BluetoothListener {
 
     /* Notify detection result */
     void bleNotifyDetectionResult(double score);
+
+    void bleReturnDeviceVersion(int version);
 
 }

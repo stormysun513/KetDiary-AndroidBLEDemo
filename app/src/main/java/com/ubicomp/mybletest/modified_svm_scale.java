@@ -1,4 +1,4 @@
-package com.ubicomp.bletest;
+package com.ubicomp.mybletest;
 
 import java.io.BufferedReader;
 import java.io.FileReader;

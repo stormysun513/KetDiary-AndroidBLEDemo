@@ -1,4 +1,4 @@
-package com.ubicomp.bletest;
+package com.ubicomp.mybletest;
 
 import java.io.DataOutputStream;
 import java.io.IOException;

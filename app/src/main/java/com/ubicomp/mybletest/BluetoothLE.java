@@ -1,4 +1,4 @@
-package com.ubicomp.bletest;
+package com.ubicomp.mybletest;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -39,8 +39,8 @@ public class BluetoothLE {
     public static final UUID SERVICE3_WRITE_CHAR_UUID = UUID.fromString("713D0003-503E-4C75-BA94-3148F18D941E");
     private static final UUID SERVICE3_NOTIFICATION_CHAR_UUID = UUID.fromString("713D0002-503E-4C75-BA94-3148F18D941E");
 
-    public final static byte BLE_REQUEST_CASSETTE_ID = (byte)0x00;
-    public final static byte BLE_CHANGE_DEVICE_ID = (byte)0x01;
+    public final static byte BLE_SWITCH_MONITORING = (byte)0x00;
+    public final static byte BLE_CHANGE_CASSETTE_ID = (byte)0x01;
     public final static byte BLE_REQUEST_SALIVA_VOLTAGE = (byte)0x02;
     public final static byte BLE_REQUEST_IMAGE_INFO = (byte)0x03;
     public final static byte BLE_REQUEST_IMAGE_BY_INDEX = (byte)0x04;
@@ -48,13 +48,15 @@ public class BluetoothLE {
     public final static byte BLE_DEREQUEST_SALIVA_VOLTAGE = (byte)0x06;
     public final static byte BLE_SHUTDOWN = (byte)0x07;
     public final static byte BLE_UNLOCK_BUTTON = (byte)0x08;
+    public final static byte BLE_UART_DEBUG = (byte)0x09;
     public final static byte BLE_DEVICE_INFO = (byte)0x0A;
 
 
     public final static byte BLE_REPLY_IMAGE_INFO = (byte)0x00;
     public final static byte BLE_REPLY_SALIVA_VOLTAGE = (byte)0x01;
-    public final static byte BLE_REPLY_CASSETTE_ID = (byte)0x02;
+    public final static byte BLE_REPLY_MONITORING = (byte)0x02;
     public final static byte BLE_REPLY_IMAGE_PACKET = (byte)0x03;
+    public final static byte BLE_REPLY_DEVICE_INFO = (byte)0x04;
 
     public enum AppStateTypeDef {
         APP_FETCH_INFO,
@@ -245,22 +247,31 @@ public class BluetoothLE {
                     default:
                     {
                         switch(data[0]) { // Handling notification depending on types
-                            case BLE_REPLY_CASSETTE_ID:
+                            case BLE_REPLY_MONITORING:
+                            {
                                 int cassetteId = ((data[1] & 0xFF) << 8) + (data[2] & 0xFF);
                                 int battVolt = ((data[3] & 0xFF) << 8) + (data[4] & 0xFF);
 
-                                if(cassetteId == 0xFFFF){
+                                if (cassetteId == 0xFFFF) {
                                     ((BluetoothListener) activity).bleNoPlugDetected();
-                                }
-                                else{
+                                } else {
                                     ((BluetoothListener) activity).blePlugInserted(cassetteId);
                                 }
                                 ((BluetoothListener) activity).bleUpdateBattLevel(battVolt);
                                 break;
+                            }
                             case BLE_REPLY_SALIVA_VOLTAGE:
+                            {
                                 int value = ((data[1] & 0xFF) << 8) + (data[2] & 0xFF);
                                 ((BluetoothListener) activity).bleUpdateSalivaVolt(value);
                                 break;
+                            }
+                            case BLE_REPLY_DEVICE_INFO:
+                            {
+                                int version = ((data[1] & 0xFF) << 8) + (data[2] & 0xFF);
+                                ((BluetoothListener) activity).bleReturnDeviceVersion(version);
+                                break;
+                            }
                         }
                         break;
                     }
@@ -380,11 +391,12 @@ public class BluetoothLE {
             mBluetoothLeService.disconnect();
         }
         terminatePacketParser();
-//        if(!mConnected) {
-//            //Terminate the BLE connection timeout (10sec)
-//            mHandler.removeCallbacks(mRunnable);
-//            mBluetoothAdapter.stopLeScan(mLeScanCallback);
-//        }
+
+        if(!mConnected) {
+            //Terminate the BLE connection timeout (10sec)
+            mHandler.removeCallbacks(mRunnable);
+            mBluetoothAdapter.stopLeScan(mLeScanCallback);
+        }
     }
 
     public void bleRequestSalivaNotification(){
@@ -400,7 +412,7 @@ public class BluetoothLE {
     }
 
     public void bleRequestCassetteInfo(){
-        byte[] command = new byte[]{BluetoothLE.BLE_REQUEST_CASSETTE_ID};
+        byte[] command = new byte[]{BluetoothLE.BLE_SWITCH_MONITORING};
         mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
         bleWriteCharacteristic1(command);
     }
@@ -412,7 +424,10 @@ public class BluetoothLE {
     }
 
     public void bleRequestDeviceInfo(){
-        // TODO : GET DEVICE INFORMATION
+        // GET DEVICE INFORMATION
+        byte[] command = new byte[]{BluetoothLE.BLE_DEVICE_INFO};
+        mAppStateTypeDef = BluetoothLE.AppStateTypeDef.APP_FETCH_INFO;
+        bleWriteCharacteristic1(command);
     }
 
     /* Timeout implementation */

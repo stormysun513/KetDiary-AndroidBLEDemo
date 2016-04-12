@@ -1,15 +1,21 @@
 apply plugin: 'com.android.application'
 
 android {
+    signingConfigs {
+        mybletest {
+            keyAlias 'android.keystore'
+            keyPassword 'ubicomp'
+            storeFile file('/Users/larry/StudioProjects/android.store')
+            storePassword 'ubicomp'
+        }
+    }
     compileSdkVersion 21
     buildToolsVersion "23.0.0"
-
     defaultConfig {
-        applicationId "com.example.bletest"
+        applicationId "com.ubicomp.mybletest"
         minSdkVersion 8
         targetSdkVersion 21
     }
-
     buildTypes {
         release {
             minifyEnabled false

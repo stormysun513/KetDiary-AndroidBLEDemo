@@ -1,4 +1,4 @@
-package com.ubicomp.bletest;
+package com.ubicomp.mybletest;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
@@ -14,16 +14,13 @@ import org.opencv.core.Mat;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
-import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -38,7 +35,7 @@ public class ImageDetection {
     private static final int SEARCH_REGION_X_MIN = 165;
     private static final int SEARCH_REGION_X_MAX = 220;
     private static final int SEARCH_REGION_Y_MIN = 60;
-    private static final int SEARCH_REGION_Y_MAX = 200;
+    private static final int SEARCH_REGION_Y_MAX = 220; // 200
 
     private static final int DEFAULT_X_MIN = 175;
     private static final int DEFAULT_X_MAX = 205;   //30
@@ -49,6 +46,7 @@ public class ImageDetection {
     private static final int ROI_WIDTH = 127;
 
     private static final int WHITE_THRESHOLD = 220;
+    private static final int VALIDATION_THRESHOLD = 90;
 
     private int xmin = DEFAULT_X_MIN;
     private int xmax = DEFAULT_X_MAX;
@@ -146,10 +144,23 @@ public class ImageDetection {
             Log.d(TAG, "FAIL TO WRITE FILE : " + file_save_path.getAbsolutePath());
         }
 
-
         Bitmap bitmap_orig = BitmapFactory.decodeByteArray(data, 0, data.length);
         Mat mat_cropped = getROIRegionMat(bitmap_orig);
+
+        File predict_out_path = new File(result_directory, predict_out_name);
         File scale_param_path = new File(model_directory, scale_param_name);
+        File svm_model_path = new File(model_directory, svm_model_name);
+        DataOutputStream data_out_stream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(predict_out_path)));
+
+        /* Check validation */
+        boolean check = checkValidationLine(mat_cropped);
+        Log.i(TAG, "Validation : " + check);
+        if(!check){
+            data_out_stream.writeBytes("Invalid control line.");
+            data_out_stream.close();
+            return -1000;
+        }
+
         String image_svm_feat = imageToSvmFeat(mat_cropped);          // Close for DEBUG
 
         // DEBUG : fake data used for svm input to make sure the match of feature dimension
@@ -162,16 +173,12 @@ public class ImageDetection {
 
         // SVM detection
         String output = svm_scale.svm_scale(scale_param_path.toString(), image_svm_feat); // Close for DEBUG
-        File predict_out_path = new File(result_directory, predict_out_name);
-        File svm_model_path = new File(model_directory, svm_model_name);
-        DataOutputStream data_out_stream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(predict_out_path)));
-
-        if(!svm_predict.isModelLoaded())
+        if(!svm_predict.isModelLoaded()){
             svm_predict.loadModel(svm_model_path.toString());
+        }
 
         result = svm_predict.predict(output, data_out_stream, 1);
         data_out_stream.close();
-
         return result;
     }
 
@@ -250,6 +257,36 @@ public class ImageDetection {
         }
 
         return mat_rotated;
+    }
+
+    private boolean checkValidationLine(Mat mat_cropped){
+        int halfCol = mat_cropped.cols()/4 + 1;
+        int ctrlBeginCol = mat_cropped.cols()/2 - 10;
+
+        Rect rect_roi = new Rect(ctrlBeginCol, 0, halfCol, mat_cropped.rows());
+        Mat mat_control = new Mat(mat_cropped, rect_roi);
+        Mat mat_canny_control = new Mat();
+        Imgproc.Canny(mat_control, mat_canny_control, CANNY_THRES1, CANNY_THRES2);
+        mat_control.release();
+
+        Mat mat_sobel_control = new Mat();
+        Imgproc.Sobel(mat_canny_control, mat_sobel_control, Imgcodecs.IMREAD_GRAYSCALE, 1, 0);
+        mat_canny_control.release();
+
+        int count_control = 0;
+        byte [] bytes_sobel_control = new byte[mat_sobel_control.cols()*mat_sobel_control.rows()*mat_sobel_control.channels()];
+        mat_sobel_control.get(0, 0, bytes_sobel_control);
+        mat_sobel_control.release();
+        for(byte b: bytes_sobel_control){
+            if(b != 0)
+                count_control++;
+        }
+        Log.i(TAG, "Validation:" + count_control*50/mat_cropped.rows() + "%");
+
+        if(count_control*50/mat_cropped.rows() > VALIDATION_THRESHOLD)
+            return true;
+        else
+            return false;
     }
 
     private String imageToSvmFeat(Mat mat_cropped){
