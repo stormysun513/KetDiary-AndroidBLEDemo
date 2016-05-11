@@ -32,21 +32,21 @@ import java.util.List;
 public class ImageDetection {
     private static final String TAG = "ImageDetection";
 
-    private static final int SEARCH_REGION_X_MIN = 165;
-    private static final int SEARCH_REGION_X_MAX = 220;
-    private static final int SEARCH_REGION_Y_MIN = 60;
-    private static final int SEARCH_REGION_Y_MAX = 220; // 200
+    private static final int SEARCH_REGION_X_MIN = 180;
+    private static final int SEARCH_REGION_X_MAX = 250;
+    private static final int SEARCH_REGION_Y_MIN = 40;
+    private static final int SEARCH_REGION_Y_MAX = 200; // 200
 
-    private static final int DEFAULT_X_MIN = 175;
-    private static final int DEFAULT_X_MAX = 205;   //30
-    private static final int DEFAULT_Y_MIN = 70;
-    private static final int DEFAULT_Y_MAX = 197;   //127
+    private static final int DEFAULT_X_MIN = 196;
+    private static final int DEFAULT_X_MAX = 226;   //30
+    private static final int DEFAULT_Y_MIN = 65;
+    private static final int DEFAULT_Y_MAX = 192;   //127
 
     private static final int ROI_LENGTH = 30;
     private static final int ROI_WIDTH = 127;
 
     private static final int WHITE_THRESHOLD = 220;
-    private static final int VALIDATION_THRESHOLD = 90;
+    private static final int VALIDATION_THRESHOLD = 100;
 
     private int xmin = DEFAULT_X_MIN;
     private int xmax = DEFAULT_X_MAX;
@@ -67,7 +67,8 @@ public class ImageDetection {
     File result_directory = null;
     Long timestamp = null;
 
-    private static final String model_directory_name = "DetectionParameters";
+//    private static final String model_directory_name = "DetectionParameters";
+    private static final String model_directory_name = "RehabDiary2/SVM";
     private static final String result_directory_name = "DetectionResult";
 
     private static final String svm_model_name = "model.out";
